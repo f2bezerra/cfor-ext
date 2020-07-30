@@ -3093,11 +3093,12 @@ function solve(expr, undef, vars = null, unescape = true) {
 	if (vars && (s = expr.match(/^\s*\$([a-z][\w_]*)\s*$/i))) {
 		value = vars[s[1]]; 
 		if (value != undefined) {
-			if (Array.isArray(value)) return value;
+			if (Array.isArray(value)) return value.length ? value : null;
 			if (isNaN(value)) return " " + value;
 			return value;
 		}
 		
+		if (undef && undef.test(expr)) return undefined;
 		return "";
 	};
 	
@@ -3108,9 +3109,11 @@ function solve(expr, undef, vars = null, unescape = true) {
 			
 			if (s[4] == "&&") {
 				if (!result) return result;
+				if (Array.isArray(result) && !result.length) return 0;
 				expr = " " + expr.slice(s[0].length);	
 			} else {
 				if (result) return result;
+				if (Array.isArray(result) && result.length) return result.length;
 				expr = " " + expr.slice(s[0].length);	
 			}
 			
@@ -3153,7 +3156,7 @@ function solve(expr, undef, vars = null, unescape = true) {
 				if (op1_date = op1.toString().toDate()) {
 					if (!isNaN(op2) && op2 >= 1970 && op2 <= 9999) return op1_date.getFullYear() == op2;
 					if (op2_date = op2.toString().toDate()) return op1_date.diffDays(op2_date) == 0;
-				}
+				} else if ((op2_date = op2.toString().toDate()) && !isNaN(op1) && op1 >= 1970 && op1 <= 9999) return op1 == op2_date.getFullYear();
 				return op1 == op2;
 			}
 
@@ -3161,7 +3164,7 @@ function solve(expr, undef, vars = null, unescape = true) {
 				if (op1_date = op1.toString().toDate()) {
 					if (!isNaN(op2) && op2 >= 1970 && op2 <= 9999) return op1_date.getFullYear() != op2;
 					if (op2_date = op2.toString().toDate()) return op1_date.diffDays(op2_date) != 0;
-				}
+				} else if ((op2_date = op2.toString().toDate()) && !isNaN(op1) && op1 >= 1970 && op1 <= 9999) return op1 != op2_date.getFullYear();
 				return op1 != op2;
 			}
 
@@ -3169,7 +3172,7 @@ function solve(expr, undef, vars = null, unescape = true) {
 				if (op1_date = op1.toString().toDate()) {
 					if (!isNaN(op2) && op2 >= 1970 && op2 <= 9999) return op1_date.getFullYear() < op2;
 					if (op2_date = op2.toString().toDate()) return op1_date.diffDays(op2_date) < 0;
-				}
+				} else if ((op2_date = op2.toString().toDate()) && !isNaN(op1) && op1 >= 1970 && op1 <= 9999) return op1 < op2_date.getFullYear();
 				return op1 < op2;
 			}
 			
@@ -3177,7 +3180,7 @@ function solve(expr, undef, vars = null, unescape = true) {
 				if (op1_date = op1.toString().toDate()) {
 					if (!isNaN(op2) && op2 >= 1970 && op2 <= 9999) return op1_date.getFullYear() <= op2;
 					if (op2_date = op2.toString().toDate()) return op1_date.diffDays(op2_date) <= 0;
-				}
+				} else if ((op2_date = op2.toString().toDate()) && !isNaN(op1) && op1 >= 1970 && op1 <= 9999) return op1 <= op2_date.getFullYear();
 				return op1 <= op2;
 			}
 
@@ -3185,7 +3188,7 @@ function solve(expr, undef, vars = null, unescape = true) {
 				if (op1_date = op1.toString().toDate()) {
 					if (!isNaN(op2) && op2 >= 1970 && op2 <= 9999) return op1_date.getFullYear() > op2;
 					if (op2_date = op2.toString().toDate()) return op1_date.diffDays(op2_date) > 0;
-				}
+				} else if ((op2_date = op2.toString().toDate()) && !isNaN(op1) && op1 >= 1970 && op1 <= 9999) return op1 > op2_date.getFullYear();
 				return op1 > op2;
 			}
 			
@@ -3193,7 +3196,7 @@ function solve(expr, undef, vars = null, unescape = true) {
 				if (op1_date = op1.toString().toDate()) {
 					if (!isNaN(op2) && op2 >= 1970 && op2 <= 9999) return op1_date.getFullYear() >= op2;
 					if (op2_date = op2.toString().toDate()) return op1_date.diffDays(op2_date) >= 0;
-				}
+				} else if ((op2_date = op2.toString().toDate()) && !isNaN(op1) && op1 >= 1970 && op1 <= 9999) return op1 >= op2_date.getFullYear();
 				return op1 >= op2;
 			}
 
@@ -3204,9 +3207,12 @@ function solve(expr, undef, vars = null, unescape = true) {
 			} 
 			
 			case "-": {
-				op1_date = op1.toString().toDate();
-				
-				if (op1_date && (op2_date = op2.toString().toDate())) return op1_date.diffDays(op2_date);
+				if (op1_date = op1.toString().toDate()) {
+					if (!isNaN(op2) && op2 >= 1970 && op2 <= 9999) return op1_date.diffDays(new Date(`01/01/${op2}`));
+					if (op2_date = op2.toString().toDate()) return op1_date.diffDays(op2_date);
+				} else if ((op2_date = op2.toString().toDate()) && !isNaN(op1) && op1 >= 1970 && op1 <= 9999) return (new Date(`01/01/${op1}`)).diffDays(op2_date);
+
+				if (op1_date && op2_date) return op1_date.diffDays(op2_date);
 				if (op1_date) return op1_date.addDate("-" + op2).toDateBR();
 				return isNaN(op1) || isNaN(op2) ? s[0] : Number(op1) - Number(op2);
 			} 

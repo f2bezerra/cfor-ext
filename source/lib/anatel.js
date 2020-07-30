@@ -245,14 +245,26 @@ async function consultarExtrato(fistel, filter) {
 				lancto.pagto = $(cols[5]).text().trim();
 				lancto.pago = Number($(cols[6]).text().replace(/[^\d,]/g,"").replace(",", "."));
 				lancto.util = Number($(cols[7]).text().replace(/[^\d,]/g,"").replace(",", "."));
-				if (lancto.situacao = $(cols[9]).text().trim()) {
-					if (lancto.situacao.includes("Vencer")) lancto.status = "V";
-					else if (lancto.situacao.includes("Maior")) lancto.status = "M";
-						else lancto.status = lancto.situacao[0].toUpperCase();
-				}
+				
+				do {
+					if (lancto.situacao = $(cols[9]).text().trim()) {
+						if (lancto.situacao.includes("Vencer")) lancto.status = "V";
+						else if (lancto.situacao.includes("Maior")) lancto.status = "M";
+							else lancto.status = lancto.situacao[0].toUpperCase();
+					} else {
+						row = $(row).next('tr:not([id^=TRplus])').get(0);
+						if (!row) break;
+						cols = $(row).children('td');
+						lancto.pagto = $(cols[5]).text().trim();
+						lancto.pago += Number($(cols[6]).text().replace(/[^\d,]/g,"").replace(",", "."));
+						lancto.util += Number($(cols[7]).text().replace(/[^\d,]/g,"").replace(",", "."));
+					}
+				} while (!lancto.situacao);
+
 				lancto.pendente = lancto.status == "D" || lancto.status == "P" || lancto.status == "V";
 				
 				result.lancamentos.push(lancto);	
+				
 			});
 			
 			if (filter) result.lancamentos = result.lancamentos.filter(lancto => {

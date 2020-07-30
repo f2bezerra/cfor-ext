@@ -15,7 +15,6 @@ script_beforesave.textContent = `var hsbs = setInterval(function() {
 }, 400);`;
 (document.body||document.documentElement).appendChild(script_beforesave);
 
-
 //Localizar editor com o documento automatizável
 var editor, alt_editor, html, tipo_doc;
 $("#frmEditor [name^='txaEditor_']").each((i, ed) => {
@@ -142,14 +141,17 @@ if (editor) {
 		return "";
 	});
 
+	//Função de escrita de texto destacado
+	var HLText = (text, color="red") => `<span style="background-color:${color};">${text}</span>`;
+
 	//--- INTERPRETAÇÃO DOS CAMPOS
 
 	//intepretar campos %desc_servico%, %ind_servico%, %cod_servico% e %sigla_servico%
 	html = html.replace(/%(desc|ind|cod|sigla)_servico(?:@([^%]+))?%/ig, (m0, prefix, format) => {
 		var value;
 		switch (prefix.toLowerCase()) {
-			case "desc": value = desc_servico == undefined?'<span style="background-color:#ff0000;">*** Serviço Desconhecido ***</span>':desc_servico; break;
-			case "ind": value = ind_servico == undefined?'<span style="background-color:#ff0000;">*** Desconhecido ***</span>':ind_servico; break;
+			case "desc": value = desc_servico == undefined?HLText("*** Serviço Desconhecido ***"):desc_servico; break;
+			case "ind": value = ind_servico == undefined?HLText("*** Desconhecido ***"):ind_servico; break;
 			case "cod": value = cod_servico == undefined?'000':cod_servico; break;
 			case "sigla": value = sigla_servico == undefined?'':sigla_servico; break;
 		}
@@ -169,14 +171,14 @@ if (editor) {
 		let value;
 		
 		if (sufix.toLowerCase() == "int") {
-			if (!cpfj_int) return '<span style="background-color:#ff0000;">*** CPF/CNPJ do Interessado Desconhecido ***</span>';
+			if (!cpfj_int) return HLText("*** CPF/CNPJ do Interessado Desconhecido ***");
 			value = cpfj_int;
 		} else {
-			if (!cpfj_dest) return '<span style="background-color:#ff0000;">*** CPF/CNPJ do Destinatário é Desconhecido ***</span>';
+			if (!cpfj_dest) return HLText("*** CPF/CNPJ do Destinatário é Desconhecido ***");
 			value = cpfj_dest;
 		}
 		
-		var value = format.includes("num")?value.replace(/\D/g,""):value;
+		value = format.includes("num")?value.replace(/\D/g,""):value;
 		
 		if (is_pfj(cpfj_int) == "f") {
 			if (format.includes("*")) value = "***" + value.slice(3,-2) + "**"
@@ -203,7 +205,7 @@ if (editor) {
 	//interpretar campos %is_sarc%
 	html = html.replace(/%is_sarc%/ig, (m0) => {
 		var n = cod_servico == undefined ? 0 : parseInt(cod_servico);
-		return !n ? '<span style="background-color:#ff0000;">???</span>' : n > 250 && n < 256 ? "1" : "0";
+		return !n ? HLText("???") : n > 250 && n < 256 ? "1" : "0";
 	});
 	
 	//interpretar campos %usu_sei_ok%
@@ -297,8 +299,8 @@ if (editor) {
 	
 	//incluir forma de tratamento de destinatário quando não definido
 	html = html.replace(/@tratamento_destinatario@/gi, (m0) => {
-		if (is_pfj(cpfj_dest) == "f") return '<span style="background-color:#ff0000;">Ao(À) Senhor(a)</span>';
-		return '<span style="background-color:#ff0000;">Ao(À) Senhor(a) Representante Legal de</span>';
+		if (is_pfj(cpfj_dest) == "f") return HLText("Ao(À) Senhor(a)");
+		return HLText("Ao(À) Senhor(a) Representante Legal de");
 	});
 	
 	//apagar complemento de endereço quando não definido
@@ -308,13 +310,13 @@ if (editor) {
 	
 	//corrigir automaticamente denominação do cargo de gerência
 	html = html.replace(/O GERENTE REGIONAL DA ANATEL\s*(?=(?:<\/[^>]+>)?\s*,)/g, (m0) => {
-		return `<span style="background-color:#ff0;">O GERENTE REGIONAL DA ANATEL NO ESTADO DO RIO GRANDE DO SUL</span>`;
+		return HLText("O GERENTE REGIONAL DA ANATEL NO ESTADO DO RIO GRANDE DO SUL", "yellow");
 	});
 	
 	//inserir Portaria 889 (Delegação) nos atos quando não existir
 	if (tipo_doc == "ato" && !html.match(/\bPortaria\s*?n\.?(?:\s|&\w+;)*?889\b/i)) {
-		let portaria = `<span style="background-color:#ff0;">CONSIDERANDO o disposto na <a data-cke-saved-href="http://www.anatel.gov.br/legislacao/portarias-de-delegacao/645-portaria-889" href="http://www.anatel.gov.br/legislacao/portarias-de-delegacao/645-portaria-889" target="_blank">
-		Portaria n.º&nbsp;889, de 07 de novembro de 2013</a>, que delega competências às Gerências Regionais para aprovação, expedição, adaptação, prorrogação e extinção, exceto por caducidade, de autorização para exploração de serviços de telecomunicações, e de uso de radiofrequências decorrentes, em regime privado de interesse restrito;</span>`;
+		let portaria = HLText(`CONSIDERANDO o disposto na <a data-cke-saved-href="http://www.anatel.gov.br/legislacao/portarias-de-delegacao/645-portaria-889" href="http://www.anatel.gov.br/legislacao/portarias-de-delegacao/645-portaria-889" target="_blank">
+		Portaria n.º&nbsp;889, de 07 de novembro de 2013</a>, que delega competências às Gerências Regionais para aprovação, expedição, adaptação, prorrogação e extinção, exceto por caducidade, de autorização para exploração de serviços de telecomunicações, e de uso de radiofrequências decorrentes, em regime privado de interesse restrito;`, "yellow");
 		
 		html = html.replace(/[\w\W]*?(<p[^>]*?>)(?=(?:\s*?<\w[^>]*?>)?\s*?CONSIDERANDO)/i, `$&${portaria}</p>$1`);
 	}
@@ -322,9 +324,9 @@ if (editor) {
 	//--- FUNÇÕES DE AUTOMATIZAÇÃO
 	
 	//---Função para aplicação dos testes de condicionamento
-	var apply_conditions = html => {
+	var apply_conditions = (html, defer_vars) => {
 		
-		let regex_undef = /%\w+\(.*\)%/i;
+		let regex_undef = defer_vars ? /%\w+\(.*\)%|\$\w[\w_]*\b/i : /%\w+\(.*\)%/i;
 		let block_regex =  /(<p[^>]*?><code[^>]*?>{#if\s*([^}]*?)}<\/code><\/p>([\w\W]*?)?)(<p[^>]*?><code[^>]*?>{#if\s*[^}]*?}<\/code><\/p>[\w\W]*?)?(?:<p[^>]*?><code[^>]*?>{#else}<\/code><\/p>([\w\W]*?))?<p[^>]*?><code[^>]*?>{#endif}<\/code><\/p>/ig;
 		let inline_regex = /(<code[^>]*?>{#if\s*([^}]*?)}<\/code>(?!<\/p>)([\w\W]*?)?)(<code[^>]*?>{#if\s*[^}]*?}<\/code>[\w\W]*?)?(?:<code[^>]*?>{#else}<\/code>([\w\W]*?))?<code[^>]*?>{#endif}<\/code>/ig;
 		
@@ -363,175 +365,10 @@ if (editor) {
 		
 		return html;
 	};
+
 	
-	//---Função para preenchimento das tabelas dinâmicas
-	var fill_dynamic_tables = function() {
-		return waitDocumentReady(`#cke_${editor.name} iframe`).then(doc => {
-			
-			let write_row_message = function(t, m, c) {
-				$(t).find("tbody tr").remove();
-				let n_cols = $(t).find("thead tr:last th").length;
-				$(t).find("tbody").append(`<tr><td colspan="${n_cols}"><p class="Tabela_Texto_Centralizado" style="${c?"color:" + c + ";":""}">${m}</p></td></tr>`)
-			};
-			
-			let $tables = $(doc).find("table[dynamic-table]");
-			
-			if ($tables.length) {
-				let promises = [];
-				
-
-				waitMessage("Atualizando tabelas dinâmicas...");
-				
-				$tables.each((index, table) => {
-					
-					let table_type = $(table).attr("dynamic-table").toLowerCase();
-					let table_id = $(table).attr("dynamic-table-id");
-					let table_data = $(table).attr("dynamic-table-data");
-
-					$(table).removeAttr("dynamic-table dynamic-table-id dynamic-table-data");
-					
-					if (!table_data) {
-						write_row_message(table, "Nenhum parâmetro para preenchimento da tabela informado", "red");
-						return;
-					}
-					
-					let row_html = $(table).find("tbody tr:first").get(0);
-					if (!row_html) {
-						write_row_message(table, "Linha de preenchimento inexistente", "red");
-						return;
-					}
-					
-					row_html = row_html.outerHTML;
-					
-					switch (table_type) {
-						case "lancto": {
-							let v = table_data.match(/&?\bfistel=(.*?)(?=&\w+=|$)/i);
-							let fistel = v ? v[1] : null;
-							let filter = "";
-								
-							if (v = table_data.match(/&?\bstatus=(.*?)(?=&\w+=|$)/i)) {
-								switch (v[1].trim().toLowerCase()) {
-									case 'd': filter = "$status == D"; break;
-									case 'q': filter = "$status == Q"; break;
-									case 'p': filter = "$pendente"; break;
-								}
-							}
-						
-							if (v = table_data.match(/&?\bini=(.*?)(?=&\w+=|$)/i)) filter = (filter ? " && " : "") + "$vencto >= " + v[1];
-							if (v = table_data.match(/&?\bfin=(.*?)(?=&\w+=|$)/i)) filter = (filter ? " && " : "") + "$vencto <= " + v[1];
-							
-							let prom = consultarExtrato(fistel, filter).then(data => {
-								if (data.lancamentos && data.lancamentos.length) {
-									$(table).find("tbody tr").remove();
-									
-									data.lancamentos.forEach(lan => {
-										let tr = row_html.replace(/{fistel}/ig, fistel);
-										tr = tr.replace(/{receita}/ig, lan.receita);
-										tr = tr.replace(/{seq}/ig, lan.seq.toString().padStart(3,'0'));
-										tr = tr.replace(/{vencto}/ig, lan.vencto);
-										tr = tr.replace(/{valor}/ig, lan.valor.toMoney());
-										if (lan.pendente) lan.situacao = `<span style="color: red;">${lan.situacao}</span>`;
-										tr = tr.replace(/{status}/ig, lan.situacao);
-										$(table).find("tbody").append(tr);
-									});
-								} else write_row_message(table, "Tabela vazia", "red");
-								
-								return true;
-							}).catch(error => {
-								write_row_message(table, error, "red");
-								return Promise.resolve(false);
-							}); 
-							
-							promises.push(prom);
-							
-							break;
-						}
-						
-					}
-				});
-				
-				return Promise.all(promises).finally(() => {waitMessage(null)});
-			}
-			
-		}, error => errorMessage(error));
-	};
-	
-	//---Função para atualizar alterações
-	var update_changes = function(html) {
-		//sequenciadores
-		html = html.replace(/%seq_([^%]+)%/ig, (m0,m1) => {
-			if (seq[m1] == undefined) seq[m1] = 1;
-			else seq[m1]++;
-
-			return seq[m1].toString();
-		});
-		
-		//links para boletos
-		html = html.replace(/%link_boleto\((.*?)(?:\s*;(.*?))?(?:\s*;(.*?))?\)%/ig, (m0,m1,m2,m3) => {
-			if (!m2 && !(m2 = findFieldValue(fields, "fistel", "num"))) m2 = "";
-			else m2 = validateFistel(m2) ? m2 : "";
-			
-			if (!m3 && !(m3 = cpfj_int)) return m3 = "";
-			else m3 = validateCpfj(m3) ? m3.replace(/\D/g,"") : "";
-			
-			let url;
-			
-			if (m2 && m3) url = `https://sistemas.anatel.gov.br/Boleto/Internet/Consulta.asp?indTipoBoleto=d&indTipoConsulta=c&Ano=&Mes=&Ordenacao=datavencimento&PaginaOrigem=&acao=c&MC=&cmd=&plataforma=E&Sistema=&NumCNPJCPF=${m3}&NumFistel=${m2}`;
-			else url = `https://sistemas.anatel.gov.br/Boleto/Internet/Tela.asp?NumCNPJCPF=${m3}&NumFistel=${m2}`;
-			
-			return `<a data-cke-saved-href="${url}" href="${url}" target="_blank">${m1}</a>`;
-			
-		});
-		
-		//Operação ternária
-		html = html.replace(/<code[^>]*?>\s*{#\?([^?]*)\?([^:}]*)(?::([^}]*))}\s*<\/code>/gi, (m0, m1, m2, m3) => {
-			return solve(m1, null, uservars) ? m2 : m3 ? m3 : "";
-		});
-		
-		
-		return html;
-	};
-
-	//---Função para atualizar altura do corpo do documento
-	var after_fill_dynamic_tables = function() {
-		waitDocumentReady(`#cke_${editor.name} iframe`).then(doc => {$(`#cke_${editor.name} iframe`).parent().css("height", $(doc).height())});
-	};
-	
-	//---Função para executar últimas operações
-	var last_operations = function() {
-		waitDocumentReady(`#cke_${editor.name} iframe`).then(doc => {
-			//Colocar ponto final em lista
-			$(doc).find('ul li:last').each((i, li) => $(li).html($(li).html().replace(/([\w\W]*);(<[^>]*?>|\n|\s)*$/, "$1.$2")));
-			
-			$(doc.body).on("dragover", function (e) {
-				e.preventDefault();
-
-				let link_id = e.originalEvent.dataTransfer.getData("sei/link-id");
-				if (link_id) return false;
-			});
-
-			$(doc.body).on("drop", function (e) {
-				let link_id = e.originalEvent.dataTransfer.getData("sei/link-id");
-				
-				if (link_id) {
-					let sei_number = e.originalEvent.dataTransfer.getData("sei/number");
-			
-					e.preventDefault();
-					let sel = doc.getSelection();
-					let range = sel.getRangeAt(sel.rangeCount-1);
-					let $node = $(`<span data-cke-linksei="1" style="text-indent:0px;" contenteditable="false">SEI nº <a id="lnkSei${link_id}" class="ancoraSei" style="text-indent:0px;">${sei_number}</a></span>`);
-					range.deleteContents();
-					range.insertNode($node[0]);
-					range.collapse();
-					return false;
-				}
-			});
-
-		});
-	};
-	
-	//aplicar condições com exceção das com funções diferidas - nível 0
-	html = apply_conditions(html);
+	//aplicar condições com exceção das funções e variáveis diferidas
+	html = apply_conditions(html, true);
 
 	//montar lista de variáveis a serem fornecidas pelo usuário
 	var vars = undefined;
@@ -562,32 +399,17 @@ if (editor) {
 		return `%var(${name}${_default?";"+_default:""})%`;
 	});
 	
-	var seq = {};
-
-	//---habilitação do botão de salvamento
-	$(editor).val(html);
-
-	var script = document.createElement('script');
-	script.id = "habSalvarScript";
-	script.textContent = `var hs = setInterval(function() {
-		for (inst in CKEDITOR.instances) if (CKEDITOR.instances[inst].status != "ready") return;
-		clearInterval(hs);
-		habilitaSalvar({name:'drop'});
-		document.getElementById("habSalvarScript").remove();
-	}, 400);`;
-	(document.body||document.documentElement).appendChild(script);
-	
-	
-	//---operações diferidas
-	let deferred_functions = async function(html) {
-		if (!html || !html.match(/%(?:var|extrato)\(.*\)%)/i)) return true;
+ 	(async function(html) {
+		//executar operações diferidas primeiro
+		
+ 		if (!html || !html.match(/%(?:var|extrato)\(.*\)%/i)) return html;
 		
 	 	if (vars) {
 			let ffs = [];
 			for (let f in vars) if (vars.hasOwnProperty(f)) ffs.push(vars[f]);
 			
 			let data = await openFormDlg(ffs, "Campos do documento", {alwaysResolve: true, backgroundOpacity: 0, backgroundColor: "#aaa", nullable: false}).catch(err => {return null});
-			if (!data) return false;
+			if (!data) return html;
 			
 			for (let v in data) {
 				if (data.hasOwnProperty(v)) {
@@ -597,71 +419,206 @@ if (editor) {
 					uservars[v]= data[v];
 				} 
 			}
-		}
+		} 
 		
 		html = html.replace(/%var\([^;]*?(?:;(.*))?\)%/ig, (m0, m1) => (m1?m1:""));
-		html = replace_uservars(html);
 
-		//aplicar condições com exceção das com funções diferidas - nível 1
-		html = apply_conditions(html);
+		//aplicar condições com exceção das funções e variáveis diferidas
+		html = apply_conditions(html, true);
+		
 		
 		//executar funções extrato
-		html = html.replace(/%extrato\(\s*([\d./-]{11,14}(?:,\s*[\d./-]{11,14}\s*)*)\s*(?:;\s*(\w)\s*(?:;(.*))?)?\)%/ig, (m0, fistel, status, filtro) => {
-			fistel = fistel.replace(/[^\d,]/g, "");
-			if (!fistel.match(/^\d{11}(?:,\d{11})*$/)) return '<span style="background-color:#ff0000;">[ERRO FUNÇÃO EXTRATO] Fistel inválido</span>';
+		let extratos = null;
+		html = html.replace(/%extrato\(\s*([^;\)]+)\s*(?:;\s*(\w)\s*(?:;(.*))?)?\)%/ig, (m0, fistel, status, filtro) => {
+			fistel = replace_uservars(fistel).replace(/[^\d,]/g, "");
+			filtro = replace_uservars(filtro);
 			
-			waitMessage(`Consultando extrato para fistel ${fistel}...`);
+			if (!fistel.match(/^\d{11}(?:,\d{11})*$/)) return "";
+			
+			let id = "extrato_" + Math.floor((Math.random() * 100000));
+			let extr = {id: id, fistel: fistel, status: status, filtro: !filtro ? null : filtro.replace(/\bAND\b/g, "&&").replace(/\bOR\b/g, "||").replace(/\bNOT\b/g, "!")};
+			if (!extratos) extratos = [];
+			extratos.push(extr);
+			return "$" + id;
+		});
+		
+		if (extratos) {
+			for (let extr of extratos) {
+				let lanctos = [];
+				for (let f of extr.fistel.split(",")) {
+					try {
+						waitMessage(`Consultando extrato do fistel ${f}...`);
+						let extrato = await consultarExtrato(f, extr.filtro);
+						if (extrato && extrato.lancamentos && extrato.lancamentos.length) lanctos.push(...extrato.lancamentos.map(l => {
+							l.fistel = f;
+							return l;
+						}));
+					} catch (err) {
+						errorMessage(err);
+					}
+				}
+				uservars[extr.id] = lanctos;
+			}
+		}
+		
+		return html; 
+
+	})(html).then(html => {
+		
+		//aplicar condições com funções e variáveis diferidas
+		html = apply_conditions(html, false);
+		
+		//executar operações ternárias
+		html = html.replace(/<code[^>]*?>\s*{#\?([^?]*)\?([^:}]*)(?::([^}]*))}\s*<\/code>/gi, (m0, expr, is_true, is_false) => {
+			return solve(expr, null, uservars) ? is_true : is_false ? is_false : "";
+		});
+		
+		//interpretar sequenciadores
+		seq = {};
+		html = html.replace(/%seq_([^%]+)%/ig, (m0, name) => {
+			if (seq[name] == undefined) seq[name] = 1;
+			else seq[name]++;
+
+			return seq[name].toString();
+		});
+		
+		//links para boletos
+		html = html.replace(/%link_boleto\((.*?)(?:\s*;(.*?))?(?:\s*;(.*?))?\)%/ig, (m0, text, fistel, cpfj) => {
+			if (!fistel && !(fistel = findFieldValue(fields, "fistel", "num"))) fistel = "";
+			else fistel = validateFistel(fistel) ? fistel : "";
+			
+			if (!cpfj && !(cpfj = cpfj_int)) return cpfj = "";
+			else cpfj = validateCpfj(cpfj) ? cpfj.replace(/\D/g,"") : "";
+			
+			let url;
+			
+			if (fistel && cpfj) url = `https://sistemas.anatel.gov.br/Boleto/Internet/Consulta.asp?indTipoBoleto=d&indTipoConsulta=c&Ano=&Mes=&Ordenacao=datavencimento&PaginaOrigem=&acao=c&MC=&cmd=&plataforma=E&Sistema=&NumCNPJCPF=${cpfj}&NumFistel=${fistel}`;
+			else url = `https://sistemas.anatel.gov.br/Boleto/Internet/Tela.asp?NumCNPJCPF=${cpfj}&NumFistel=${fistel}`;
+			
+			return `<a data-cke-saved-href="${url}" href="${url}" target="_blank">${text}</a>`;
 			
 		});
 		
-		
-		
-		
-		
-		
-		
-	};
-	
-/* 	if (vars) {
-		let ffs = [];
-		for (let f in vars) if (vars.hasOwnProperty(f)) ffs.push(vars[f]);
+		let parser = new DOMParser();
+		let doc = parser.parseFromString(html, "text/html");
+		let $tables = $(doc).find("table[dynamic-table]");
+
+		//atualizar tabelas dinâmicas
+		if ($tables.length) {
+			waitMessage("Atualizando tabelas dinâmicas...");
 			
-		openFormDlg(ffs, "Campos do documento", {alwaysResolve: true, backgroundOpacity: 0, backgroundColor: "#aaa"}).then(data => {
-			waitDocumentReady(`#cke_${editor.name} iframe`).then(doc => {
-				let html = $(doc.body).html();
+			let write_row_message = (t, m, c="red") => {
+				$(t).find("tbody tr").remove();
+				let n_cols = $(t).find("thead tr:last th").length;
+				$(t).find("tbody").append(`<tr><td colspan="${n_cols}"><p class="Tabela_Texto_Centralizado" style="${c?"color:" + c + ";":""}">${m}</p></td></tr>`)
+			};
+			
+			$tables.each((index, table) => {
 				
-				for (let v in data) {
-					if (data.hasOwnProperty(v)) {
-						html = html.replace(new RegExp(`%var\\(${v}(?:@(-?\\d+,?\\d*?))?(?:;([^)]+))?\\)%`, "ig"), (m0, m1, m2) => {
-							return data[v] ? formatValue(data[v], m1) : typeof data[v] == "boolean" ? data[v] : m2 ? m2 : "";
-						});
-						uservars[v]= data[v];
-					} 
+				let table_type = $(table).attr("dynamic-table").toLowerCase();
+				let table_id = $(table).attr("dynamic-table-id");
+				let table_data = solve($(table).attr("dynamic-table-data"), null, uservars);
+
+				$(table).removeAttr("dynamic-table dynamic-table-id dynamic-table-data");
+				
+				if (!table_data) {
+					write_row_message(table, "Nenhum dado para preenchimento da tabela");
+					return;
 				}
 				
-				html = html.replace(/%var\([^;]*?(?:;(.*))?\)%/ig, (m0, m1) => (m1?m1:""));
+				if (!Array.isArray(table_data)) {
+					write_row_message(table, "Dados incompatíveis com a tabela");
+					return;
+				}
 				
-				html = apply_conditions(html);
+				if (!table_data.length) {
+					write_row_message(table, "Tabela vazia");
+					return;
+				}
 				
-				html = update_changes(html);
+				let row_template_html = $(table).find("tbody tr:first").get(0);
+				if (!row_template_html) {
+					write_row_message(table, "Linha de preenchimento inexistente");
+					return;
+				}
 				
-				$(doc.body).html(html);
+				$(table).find("tbody tr").remove();
 				
-				fill_dynamic_tables().finally(after_fill_dynamic_tables);
+				row_template_html = row_template_html.outerHTML;
+				let formater = {};
+				switch (table_type) {
+					case "lancto": formater = {seq: (r,v) => v.toString().padStart(3,'0'),
+											   valor: (r,v) => v.toMoney(),
+											   situacao: (r,v) => r.pendente ? `<span style="color: ${r.status == "V" ? "blue" : "red"};">${v}</span>` : v};
+								   break;
+				}
 				
-				last_operations();
-				
-			}).catch(error => errorMessage(error));
-		});
-	} else {
-		html = update_changes(html);
+				for (let row of table_data) {
+					let tr = row_template_html.replace(/{([\w_]+)}/ig, (m0, col) => {
+						let fmt = formater[col];
+						if (fmt) return fmt(row, row[col]);
+						return row[col];
+					});
+					$(table).find("tbody").append(tr);
+					
+				}
+			});
+		}
+		
+		waitMessage();
+		
+		//colocar ponto final no último item da lista
+		$(doc).find('ul li:last').each((i, li) => $(li).html($(li).html().replace(/([\w\W]*);(<[^>]*?>|\n|\s)*$/, "$1.$2")));
+		
+		//substituir variáveis restantes
+		html = replace_uservars(doc.body.innerHTML);
 		
 		$(editor).val(html);
 		
-		fill_dynamic_tables().finally(after_fill_dynamic_tables);
+		return waitDocumentReady(`#cke_${editor.name} iframe`).then(doc => {
+			$(doc.body).html(html);
+			return doc;
+		});
 		
-		last_operations();
-	}
- */	
+	}).then(doc => {
+		
+		
+		//arrastar e soltar link de documento SEI
+		$(doc.body).on("dragover", e => {
+			e.preventDefault();
+			let link_id = e.originalEvent.dataTransfer.getData("sei/link-id");
+			if (link_id) return false;
+		}).on("drop", e => {
+			let link_id = e.originalEvent.dataTransfer.getData("sei/link-id");
+			
+			if (link_id) {
+				let sei_number = e.originalEvent.dataTransfer.getData("sei/number");
+		
+				e.preventDefault();
+				let sel = doc.getSelection();
+				let range = sel.getRangeAt(sel.rangeCount-1);
+				let $node = $(`<span data-cke-linksei="1" style="text-indent:0px;" contenteditable="false">SEI nº <a id="lnkSei${link_id}" class="ancoraSei" style="text-indent:0px;">${sei_number}</a></span>`);
+				range.deleteContents();
+				range.insertNode($node[0]);
+				range.collapse();
+				return false;
+			}
+		});
+		
+		//redimensionar documento
+		$(`#cke_${editor.name} iframe`).parent().css("height", $(doc).height())		
+		
+		//habilitar botão de salvamento
+		let script = document.createElement('script');
+		script.id = "habSalvarScript";
+		script.textContent = `var hs = setInterval(function() {
+			for (inst in CKEDITOR.instances) if (CKEDITOR.instances[inst].status != "ready") return;
+			clearInterval(hs);
+			habilitaSalvar({name:'drop'});
+			document.getElementById("habSalvarScript").remove();
+		}, 400);`;
+		(document.body||document.documentElement).appendChild(script); 
+		
+	});
 	
 } 

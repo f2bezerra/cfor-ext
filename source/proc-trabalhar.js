@@ -270,34 +270,27 @@ document.getElementById("ifrVisualizacao").addEventListener("load", function() {
 	docV.getElementById("ifrArvoreHtml").addEventListener("load", function() {
 		
 		//LABORATORIO DE TESTES
-		// addCommand("btnLab", "lab.svg", "Teste de Novidades", null, async e => {
-			// //let info = getCurrentProcInfo();
-			// try {
-				// var extrato = await consultarExtrato("80108127907", "$ano >= 2014 && $ano <= 2017");
-				// console.log("Extrato:", extrato);
-				// infoMessage('Concluído com sucesso');
-			// } catch (err) {
-				// errorMessage(err);
+/* 		addCommand("btnLab", "lab.svg", "Teste de Novidades", null, async e => {
+			//let info = getCurrentProcInfo();
+			
+			// if (!info.cpfj) {
+				// errorMessage("CPF/CNPJ do interessado não informado.\n\nInforme no próprio cadastro do interessado **ou** inclua um campo CPF no processo.", "RA");
+				// return;
 			// }
 			
-			// // if (!info.cpfj) {
-				// // errorMessage("CPF/CNPJ do interessado não informado.\n\nInforme no próprio cadastro do interessado **ou** inclua um campo CPF no processo.", "RA");
-				// // return;
-			// // }
+			// waitMessage("Consultando...");
+			// consultarUrlServico(604, info.cpfj).then(url => chrome.runtime.sendMessage({action: "open", url: [url]})).finally(() => waitMessage(null)).catch(error => errorMessage(error, "Móvel Aeronáutico"));
+			// consultarUsuarioExterno(info.nome);
 			
-			// // waitMessage("Consultando...");
-			// // consultarUrlServico(604, info.cpfj).then(url => chrome.runtime.sendMessage({action: "open", url: [url]})).finally(() => waitMessage(null)).catch(error => errorMessage(error, "Móvel Aeronáutico"));
-			// // consultarUsuarioExterno(info.nome);
+			// if (!info.cpf) return errorMessage("CPF do interessado não informado.\n\nInforme no próprio cadastro do interessado **ou** inclua um campo CPF no processo.", "PX");
 			
-			// // if (!info.cpf) return errorMessage("CPF do interessado não informado.\n\nInforme no próprio cadastro do interessado **ou** inclua um campo CPF no processo.", "PX");
-			
-			// // autorizarPX(info.cpf, info.processo).then(data => {
-				// // waitMessage("Atualizando campos...");
-				// // storeFields([{name: "Fistel", value: data.fistel}, {name: "Indicativo", value: data.indicativo}], true).then(html => console.log('ok')).catch(err => console.log(err)).finally(() => waitMessage(null));
-			// // });
-			// // captureNextProcesso(e);
-		// });
-		
+			// autorizarPX(info.cpf, info.processo).then(data => {
+				// waitMessage("Atualizando campos...");
+				// storeFields([{name: "Fistel", value: data.fistel}, {name: "Indicativo", value: data.indicativo}], true).then(html => console.log('ok')).catch(err => console.log(err)).finally(() => waitMessage(null));
+			// });
+			// captureNextProcesso(e);
+		});
+ */		
 		
 		var doc = this.contentDocument || this.contentWindow.document;
 

@@ -69,6 +69,7 @@ function addNovo() {
 				 {id: "ato", text: "Ato", tip: "Gerar ato genérico"},
 				 {id: "certidao", text: "Certidão", tip: "Gerar certidão padrão"},
 				 "-",
+				 {id: "deferimento", text: "Deferimento", tip: "Ofício de Deferimento", icon: "menu-deferido-icon"},
 				 {id: "indeferimento", text: "Indeferimento", tip: "Ofício de Indeferimento", icon: (reference.tipo == "oficio"?"menu-favorite-icon":undefined)},
 				 {id: "arquivamento", text: "Arquivamento", tip: "Despacho de Arquivamento"}];
 				 
