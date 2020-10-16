@@ -13,6 +13,7 @@
 		}
 		
 		addNovo();
+		addAlterarDoc();
 		addPPC();
 		addBlocoAssinatura();
 		
@@ -137,6 +138,15 @@ function addNovo() {
 					predata.autoconfirm = true;
 					break;
 					
+				case "deferimento": 
+					url = $html.find("[data-desc='oficio'] .ancoraOpcao").attr("href");
+					predata.txtpad = "O-Deferimento";
+					predata.acesso = "auto";
+					if (reference && reference.tipo == "oficio") predata.reference = reference;
+					predata.autoconfirm = true;
+					
+					break;
+
 				case "indeferimento": 
 					url = $html.find("[data-desc='oficio'] .ancoraOpcao").attr("href");
 					predata.txtpad = "O- Indeferimento";
@@ -290,6 +300,25 @@ function addNovo() {
 	});
 }
 
+
+function addAlterarDoc() {
+	var btn = $('#divArvoreAcoes a[href*="acao=documento_alterar"]').get(0);
+	if (!btn) return;
+	
+	let anchor = getCurrentNode();
+
+	createPopupMenu(btn, [{id: "na_restrito", text: parseMarkdown("Alterar para Nível de Acesso **Restrito**"), icon: "menu-key-icon"},
+	                      {id: "na_publico", text: parseMarkdown("Alterar para Nível de Acesso **Público**"), icon: "menu-share-icon"}], {dropButton: "menu-drop-button"}, async e => {
+		
+		if (!await confirmMessage(`Confirmar alteração do nível de acesso para **${e.id == "na_restrito" ? "RESTRITO" : "PÚBLICO"}**?`)) return;
+		
+		waitMessage("Alterando nível de acesso...");
+		if (await alterarDocumento($(btn).attr('href'), anchor, null, e.id == "na_publico")) notify("success", "Nível de acesso alterado");
+		else notify("fail", "Nível de acesso NÃO foi alterado");
+		waitMessage(null);
+	});							  
+	
+}
 
 
 function addPPC() {
@@ -515,27 +544,29 @@ function addFuncoesAnatel() {
 
 	if (!servico) return;
 	
-	console.log("serviço: ", servico);
-	
 	//let items = []; //[{text: "Créditos", items: [{id: "lancto", text: "Lançar Créditos Retroativos", icon: "menu-money-icon"}]}];
 	let items = [{id: "cons_ent", text: "Consultar Entidade", icon: "menu-search-icon"}];
 	
 	switch (servico) {
 		case 302:
-			items.push("-", {text: "Radioamador", items: [{id: "ra_cons", text: "Consultar Serviço", icon: "extension://assets/consulta.svg"}, "-",
-														  {id: "ra_pi", text: "Incluir Serviço e Estação", icon: "extension://assets/pxra.svg"}]});
+			// items.push("-", {text: "Radioamador", items: [{id: "ra_cons", text: "Consultar Serviço", icon: "extension://assets/consulta.svg"}, "-",
+														  // {id: "ra_pi", text: "Incluir Serviço e Estação", icon: "extension://assets/pxra.svg"}]});
+			items.push({id: "ra_cons", text: "Consultar Serviço", icon: "extension://assets/consulta.svg"});
 			break;
 		case 400:
-			items.push("-", {text: "PX", items: [{id: "px_cons", text: "Consultar Serviço", icon: "extension://assets/consulta.svg"}, "-",
-												 {id: "px_pi", text: "Incluir Serviço e Estação", icon: "extension://assets/pxra.svg"}]});
+			// items.push("-", {text: "PX", items: [{id: "px_cons", text: "Consultar Serviço", icon: "extension://assets/consulta.svg"}, "-",
+												 // {id: "px_pi", text: "Incluir Serviço e Estação", icon: "extension://assets/pxra.svg"}]});
+			items.push({id: "px_cons", text: "Consultar Serviço", icon: "extension://assets/consulta.svg"});
 			break;
 
 		case 507:
-			items.push("-", {text: "Móvel Aeronáutico", items: [{id: "ma_cons", text: "Consultar Serviço", icon: "extension://assets/consulta.svg"}]});
+			// items.push("-", {text: "Móvel Aeronáutico", items: [{id: "ma_cons", text: "Consultar Serviço", icon: "extension://assets/consulta.svg"}]});
+			items.push({id: "ma_cons", text: "Consultar Serviço", icon: "extension://assets/consulta.svg"});
 			break;
 			
 		case 604:
-			items.push("-", {text: "Móvel Marítimo", items: [{id: "mm_cons", text: "Consultar Serviço", icon: "extension://assets/consulta.svg"}]});
+			// items.push("-", {text: "Móvel Marítimo", items: [{id: "mm_cons", text: "Consultar Serviço", icon: "extension://assets/consulta.svg"}]});
+			items.push({id: "mm_cons", text: "Consultar Serviço", icon: "extension://assets/consulta.svg"});
 			break;
 	}
 	

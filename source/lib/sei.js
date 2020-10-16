@@ -10,11 +10,13 @@ function parseServicoByTipo(tipo) {
 		
 		if (m[1] == "outorga") {
 			switch (m[2].toLowerCase()) {
-				case "rádio do cidadão": return {num: "400", desc: "Serviço Rádio do Cidadão", sigla: "PX"};
-				case "radioamador": return {num: "302", desc: "Serviço de Radioamador", sigla: "RA"};
-				case "slp": return {num: "019", desc: "Serviço Limitado Privado", sigla: "SLP"};
-				case "limitado móvel aeronáutico": return {num: "507", desc: "Serviço Limitado Móvel Aeronáutico", sigla: "SLMA"};
-				case "limitado móvel marítimo": return {num: "604", desc: "Serviço Limitado Móvel Marítimo", sigla: "SLMM"};
+				case "rádio do cidadão": return {tipo: "LC", num: "400", desc: "Serviço Rádio do Cidadão", sigla: "PX"};
+				case "radioamador": return {tipo: "LC", num: "302", desc: "Serviço de Radioamador", sigla: "RA"};
+				case "slp": return {tipo: "LC", num: "019", desc: "Serviço Limitado Privado", sigla: "SLP"};
+				case "limitado móvel aeronáutico": return {tipo: "LC", num: "507", desc: "Serviço Limitado Móvel Aeronáutico", sigla: "SLMA"};
+				case "limitado móvel marítimo": return {tipo: "LC", num: "604", desc: "Serviço Limitado Móvel Marítimo", sigla: "SLMM"};
+				case "serviços de interesse restrito": return {tipo: "OT", num: "002", desc: "Serviços de Interesse Restrito", sigla: "SIR"};
+				case "serviços de interesse coletivo": return {tipo: "OT", num: "001", desc: "Serviços de Interesse Coletivo", sigla: "SIC"};
 			}
 		}
 	}
@@ -26,6 +28,8 @@ function parseServicoByTipo(tipo) {
 function getTipoRegexByServico(servico) {
 	
 	switch (Number(servico)) {
+		case 1: return /Outorga:\s*(?:Servi[cç]os?\s*de\s*)?Interesse\s*Coletivo\s*$/i;
+		case 2: return /Outorga:\s*(?:Servi[cç]os?\s*de\s*)?Interesse\s*Restrito\s*$/i;
 		case 19: return /Outorga:\s*SLP\s*$/i;
 		case 251: 
 		case 252: 
@@ -48,20 +52,22 @@ function parseServicoByText(text) {
 	if (!text) return undefined;
 	
 	switch (true) {
-		case /\bLTP\b|\b251\b|Transmiss.o\s+de\s+Programa/i.test(text): return {num: "251", desc: "SARC - Ligação para Transmissão de Programas", sigla: "SARC-LTP"};
-		case /\bRE\b|\b252\b|Reportagem\s+Externa/i.test(text): return {num: "252", desc: "SARC - Reportagem Externa", sigla: "SARC-RE"};
-		case /\bOI\b|\b253\b|Ordens\s+Interna/i.test(text): return {num: "253", desc: "SARC - Comunicação de Ordens Internas", sigla: "SARC-COI"};
-		case /\bTC\b|\b254\b|Telecomando/i.test(text): return {num: "254", desc: "SARC - Telecomando", sigla: "SARC-TC"};
-		case /\bTM\b|\b255\b|Telemedi..o/i.test(text): return {num: "255", desc: "SARC - Telemedição", sigla: "SARC-TM"};
+		case /\bLTP\b|\b251\b|Transmiss.o\s+de\s+Programa/i.test(text): return {tipo: "LC", num: "251", desc: "SARC - Ligação para Transmissão de Programas", sigla: "SARC-LTP"};
+		case /\bRE\b|\b252\b|Reportagem\s+Externa/i.test(text): return {tipo: "LC", num: "252", desc: "SARC - Reportagem Externa", sigla: "SARC-RE"};
+		case /\bOI\b|\b253\b|Ordens\s+Interna/i.test(text): return {tipo: "LC", num: "253", desc: "SARC - Comunicação de Ordens Internas", sigla: "SARC-COI"};
+		case /\bTC\b|\b254\b|Telecomando/i.test(text): return {tipo: "LC", num: "254", desc: "SARC - Telecomando", sigla: "SARC-TC"};
+		case /\bTM\b|\b255\b|Telemedi..o/i.test(text): return {tipo: "LC", num: "255", desc: "SARC - Telemedição", sigla: "SARC-TM"};
 	}
 
-	if (m = text.match(/\b(?:0?19|302|400|507|604)\b/)) {
+	if (m = text.match(/\b(?:00[12]|0?19|302|400|507|604)\b/)) {
 		switch (Number(m)) {
-			case 19: return {num: "019", desc: "Serviço Limitado Privado", sigla: "SLP"};
-			case 302: return {num: "302", desc: "Serviço de Radioamador", sigla: "RA"};
-			case 400: return {num: "400", desc: "Serviço Rádio do Cidadão", sigla: "PX"};
-			case 507: return {num: "507", desc: "Serviço Limitado Móvel Aeronáutico", sigla: "SLMA"};
-			case 604: return {num: "604", desc: "Serviço Limitado Móvel Marítimo", sigla: "SLMM"};
+			case 1: return {tipo: "OT", num: "002", desc: "Serviços de Interesse Restrito", sigla: "SIR"};
+			case 2: return {tipo: "OT", num: "001", desc: "Serviços de Interesse Coletivo", sigla: "SIC"};
+			case 19: return {tipo: "LC", num: "019", desc: "Serviço Limitado Privado", sigla: "SLP"};
+			case 302: return {tipo: "LC", num: "302", desc: "Serviço de Radioamador", sigla: "RA"};
+			case 400: return {tipo: "LC", num: "400", desc: "Serviço Rádio do Cidadão", sigla: "PX"};
+			case 507: return {tipo: "LC", num: "507", desc: "Serviço Limitado Móvel Aeronáutico", sigla: "SLMA"};
+			case 604: return {tipo: "LC", num: "604", desc: "Serviço Limitado Móvel Marítimo", sigla: "SLMM"};
 		}
 	}
 	
@@ -72,6 +78,8 @@ function parseServicoByText(text) {
 //Retornar descrição do código numérico do serviço de telecomunicações
 function getDescServico(num) {
 	switch (Number(num)) {
+		case 1: return "Serviços de Interesse Coletivo";
+		case 2: return "Serviços de Interesse Restrito";
 		case 19: return "Serviço Limitado Privado";
 		case 251: return "SARC - Ligação para Transmissão de Programas";
 		case 252: return "SARC - Reportagem Externa";
@@ -85,6 +93,22 @@ function getDescServico(num) {
 	}
 	
 	return "";
+}
+
+//Retornar descrição do tipo de processo
+function getDescTipoProcesso(tipo) {
+	if (!tipo) return "Indefinido";
+	
+	switch (tipo) {
+		case "CS": return "Cassação";
+		case "LC": return "Licenciamento";
+		case "OT": return "Outorga";
+		case "PS": return "Pessoal";
+		case "RF": return "Autorização RF";
+		case "RD": return "Radiodifusão";
+	}
+	
+	return "Indefinido";
 }
 
 
@@ -122,6 +146,7 @@ function updateFormSEI(url, formId, submitButton, callback) {
 		frame.style.width = '1px';
 		frame.style.height = '1px';															
 		frame.style.opacity = 0;
+		//frame.style.zIndex = 999999999;
 		
 		frame.onload = function (e) {
 			if (submited === true) {
@@ -537,6 +562,74 @@ function consultarUsuarioExterno(id) {
 			
 		});
 	} else return Promise.reject(new Error("Url de listagem usuário externo não encontrada"));
+}
+
+
+//Alterar nível de acesso de documento
+async function alterarDocumento(url_doc_alterar, anchor_doc_alterar, descricao, acesso_publico) {
+	if (!url_doc_alterar) return Promise.reject("Endereço de alteração não informado");
+
+	return updateFormSEI(url_doc_alterar, "frmDocumentoCadastro", "btnSalvar", function (doc) {
+		if (acesso_publico) {
+			if ($optPublico = $(doc).find("#optPublico")) {
+				$optPublico.trigger("click");
+				let obs = $(doc).find("#txaObservacoes").val().replace(/com base na LGPD\b[^.]+\.\n*/ig,"");
+				$(doc).find("#txaObservacoes").val(obs);
+				$(doc).find("#selHipoteseLegal").val(0);
+			} else return false;
+		} else {
+			if ($optRestrito = $(doc).find("#optRestrito")) {
+				$optRestrito.trigger("click");
+				$optRestrito.prop("checked", true);
+				if ($selHipo = $(doc).find("#selHipoteseLegal")) {
+					let hipotese = 34;
+					if (!$selHipo.find(`option[value=${hipotese}]`).length) $selHipo.append(`<option value="${hipotese}" />`)
+					$selHipo.val(hipotese);
+					$selHipo.trigger("change");
+					let obs = $(doc).find("#txaObservacoes").val().replace(/com base na LGPD\b[^.]+\.\n*/ig,"").replace(/^[\n\r\s]+|[\n\r\s]+$/g, "");
+					obs = "Com base na LGPD, documento de identificação de pessoa física com informação biométrica, endereço de pessoa física, números de CPF ou RG, assim como, data de nascimento, e-mail pessoal e número de telefone fixo/móvel pessoal são informações pessoais." + (obs?"\n\n":"") + obs;
+					$(doc).find("#txaObservacoes").val(obs);
+				} else return false;
+				
+			} else return false;
+		}
+		
+		if (descricao) $(doc).find("#txtNumero").val(descricao);
+		return true;
+		
+	}).then(()=>{
+		if (!anchor_doc_alterar) return true;
+		
+		let anchor_id = $(anchor_doc_alterar).attr('id').replace(/\D/g, "");
+		
+		if (acesso_publico) {
+			$(anchor_doc_alterar).next('img[src*=espaco]').remove();
+			$(anchor_doc_alterar).nextAll(`#anchorNA${anchor_id}`).remove();
+		} else {
+			let anchor_restrito = `<img src="/infra_css/imagens/espaco.gif">
+			<a id="anchorNA${anchor_id}" href="javascript:alert('Acesso Restrito\nInformação Pessoal (Art. 31 da Lei nº 12.527/2011)');">
+			  <img src="imagens/sei_chave_restrito.gif" id="iconNA${anchor_id}" title="Acesso Restrito Informação Pessoal (Art. 31 da Lei nº 12.527/2011)" align="absbottom">
+			</a>`;
+			$(anchor_doc_alterar).after(anchor_restrito);
+		}
+		
+		if (descricao) {
+			let text = $(anchor_doc_alterar).text();
+			if (mtext = text.match(/^\s*([\w\d]+).*(\(\d+\))/)) {
+				let new_text = mtext[1] + " " + descricao + " " + mtext[2];
+				$(anchor_doc_alterar).html($(anchor_doc_alterar).html().replace(text, new_text));
+			} 
+		}
+		
+		return true;
+	}).catch(() => false);
+}
+
+
+//Retorna nó do documento selecionado no processo
+function getCurrentNode() {
+	if ((arvore_doc = getFrameDocument("arvore")) && (anchor = $(arvore_doc).find('.infraArvoreNoSelecionado').closest('a').get(0))) return anchor;
+	return null;
 }
 
 
@@ -1066,7 +1159,7 @@ function captureProcesso() {
 			}
 			
 			waitMessage(null);
-			chrome.runtime.sendMessage({action: "notify-success", title: 'Captura', content: 'Captura concluída com sucesso'});
+			browser.runtime.sendMessage({action: "notify-success", title: 'Captura', content: 'Captura concluída com sucesso'});
 			
 			if (p.rows.length == 1) top.window.open($(p.rows[0]).find("a[href*='acao=procedimento_trabalhar&']").attr("href"), "_self");
 			
@@ -1074,7 +1167,7 @@ function captureProcesso() {
 		
 	}).catch(error => {
 		waitMessage(null);
-		chrome.runtime.sendMessage({action: "notify-fail", title: 'Captura', content: error});
+		browser.runtime.sendMessage({action: "notify-fail", title: 'Captura', content: error});
 	});	
 }
 
@@ -1098,12 +1191,12 @@ function captureNextProcesso() {
 			if (!row) return captureProcesso();
 			
 			waitMessage(null);
-			chrome.runtime.sendMessage({action: "notify-success", title: 'Captura', content: 'Captura concluída com sucesso'});
+			browser.runtime.sendMessage({action: "notify-success", title: 'Captura', content: 'Captura concluída com sucesso'});
 			top.window.open($(row).find("a[href*='acao=procedimento_trabalhar&']").attr("href"), "_self");
 		}).catch(error => {throw error});
 	} catch(err) {
 		waitMessage(null);
-		chrome.runtime.sendMessage({action: "notify-fail", title: 'Captura', content: err});
+		browser.runtime.sendMessage({action: "notify-fail", title: 'Captura', content: err});
 	}
 }
 
@@ -1163,7 +1256,7 @@ async function addControlePagto(fistel, processo, servico, debitos, nome) {
 	else if (typeof debitos == "string" && debitos.length) debitos = debitos[0].toLowerCase();
 	else throw "Tipo de débitos inválido"
 	
-	chrome.runtime.sendMessage({action: "popup", url: getCforUrl(`cpag/cfor-ext.php?acao=incluir&processo=${processo}&servico=${servico}&fistel=${fistel}&debitos=${debitos}&nome=${nome}`), options: {width: 540, height: 220}});
+	browser.runtime.sendMessage({action: "popup", url: getCforUrl(`cpag/cfor-ext.php?acao=incluir&processo=${processo}&servico=${servico}&fistel=${fistel}&debitos=${debitos}&nome=${nome}`), options: {width: 540, height: 220}});
 	*/
 	return true;
 }
@@ -1203,16 +1296,16 @@ function applyActionPanel(items) {
 												   
 											   }
 											   
-											   chrome.runtime.sendMessage({action: "open", url: urls});
+											   browser.runtime.sendMessage({action: "open", url: urls});
 										   }},
 
 								{action: "consultar-extrato", 
 								 icon: "icon-search", 
 								 title: "Consultar Extrato", 
-								 condition: function(e) {return testFieldNames($(e.currentTarget).closest('.proc-field').attr('field-name'), /\bfistel\b/i) && validateFistel($(this).text())}, 
+								 condition: function(e) {return testFieldNames($(e.currentTarget).closest('.proc-field').attr('field-name'), /\bfistel\b|\bfistel_principal\b|\boutorga\b/i) && validateFistel($(this).text())}, 
 								 callback: function(e) {
 											   let fistel = $(this).text().replace(/\D/g,"");
-											   chrome.runtime.sendMessage({action: "open", url: `http://sistemasnet/sigec/ConsultasGerais/ExtratoLancamentos/tela.asp?NumFistel=${fistel}&tipolancamento=todos&acao=c&hdnImprimir=true`});
+											   browser.runtime.sendMessage({action: "open", url: `http://sistemasnet/sigec/ConsultasGerais/ExtratoLancamentos/tela.asp?NumFistel=${fistel}&tipolancamento=todos&acao=c&hdnImprimir=true`});
 										   }},
 
 										   
@@ -1227,7 +1320,7 @@ function applyActionPanel(items) {
 											   
 											   try {
 													let url = await consultarUrlServico(servico, indicativo);
-													chrome.runtime.sendMessage({action: "open", url: url});
+													browser.runtime.sendMessage({action: "open", url: url});
 												    waitMessage();
 											   } catch(err) {
 												   waitMessage();
@@ -1242,15 +1335,18 @@ function applyActionPanel(items) {
 								 callback: async function(e) {
 											   let indicativo = $(this).text().trim();
 											   waitMessage("Abrindo sistemas da ANAC...");
+
 											   											   
 											   try {
-													chrome.runtime.sendMessage({action: "open", url: "https://sistemas.anac.gov.br/SACI/SIAC/Aeronave/Estacao/Consulta.asp", script: `
-													var marca = document.querySelector('input[name=txtMarca]');
+													browser.runtime.sendMessage({action: "open", url: "https://sistemas.anac.gov.br/SACI/SIAC/Aeronave/Estacao/Consulta.asp", script: `
+													sessionStorage.predata_siac = JSON.stringify({indicativo: "${indicativo}", timestamp: Date.now()});
+													/*var marca = document.querySelector('input[name=txtMarca]');
 													if (marca) {
+														sessionStorage.removeItem("predata_siac");
 														marca.value = "${indicativo}";
 														var form = document.querySelector('form[name=frmAeronave]');
 														if (form) form.submit();
-													}`});
+													}*/`, runAt: "document_start"});
 												    waitMessage();
 											   } catch(err) {
 												   waitMessage();
@@ -1261,7 +1357,7 @@ function applyActionPanel(items) {
 								{action: "cpag", 
 								 icon: "icon-coin", 
 								 title: "Controle de Pagto", 
-								 condition: function(e) {return testFieldNames($(e.currentTarget).closest('.proc-field').attr('field-name'), /\bfistel\b|\bfistel_principal\b/i) && validateFistel($(this).text())}, 
+								 condition: function(e) {return testFieldNames($(e.currentTarget).closest('.proc-field').attr('field-name'), /\bfistel\b|\bfistel_principal\b|\boutorga\b/i) && validateFistel($(this).text())}, 
 								 callback: function(e) {
 											   let fistel = $(this).text().replace(/\D/g,"");
 											   confirmMessage(`Incluir controle de pagamento para o Fistel **${fistel}**?`).then(() => {
@@ -1293,11 +1389,23 @@ function updateFieldsPanel(fields) {
 	}
 }
 
+function parseNoteTags(content) {
+	if (!content) return content;
+
+	content = content.trim();
+	content = content.replace(/UMI:(.*?);/i, '<span class="umi-tag" title="Último Movimento do Interessado (UMI)">$1</span>');
+	content = content.replace(/PPC:(.*?);/i, '<span class="ppc-tag" title="Próximo Ponto de Controle (PPC)">$1</span>');
+	
+	return content;
+}
+
 
 //Atualizar conteúdo do painel de anotações na árvore do processo
 function updateNotesPanel(content) {
 	if (doc = getFrameDocument("arvore")) {
-		content = content && content.trim();
+		content = parseNoteTags(content);
+		
+
 		
 		if (content) $(doc).find('#panelNotes').css("display", "block").find('span').html(content.replace(/\n/g, "<br>"));
 		else $(doc).find('#panelNotes').css("display", "none");
@@ -1352,7 +1460,7 @@ function notify(action, msg) {
 	
 	action = action == "success" || action == "fail" ? "-" + action : "";
 	
-	chrome.runtime.sendMessage({action: `notify${action}`, content: msg});
+	browser.runtime.sendMessage({action: `notify${action}`, content: msg});
 	
 	return action === "success";
 }

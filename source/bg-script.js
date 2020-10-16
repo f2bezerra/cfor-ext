@@ -18,9 +18,7 @@ function soundNotification() {
 	audio.play();
 }
 
-function handleMessage(message) {
-	
-	if (!browser) browser = chrome;
+function handleMessage(message, sender) {
 	
 	switch (message.action) {
 		
@@ -45,7 +43,7 @@ function handleMessage(message) {
 					while (i--) browser.tabs.create({url: message.url[i], index: tab[0].index+1});
 				});
 			} else browser.tabs.create({url: message.url}).then(tab => {
-				if (message.script) browser.tabs.executeScript(tab.id, {code: message.script});
+				if (message.script) browser.tabs.executeScript(tab.id, {code: message.script, runAt: message.runAt ? message.runAt : "document_idle"});
 			});
 			
 			break;
@@ -133,8 +131,24 @@ function handleMessage(message) {
 			});
 			
 			break;
+
+			
+		case "navigate": {
+			if (!message.url) break;
+			
+				var script = message.script;
+			
+				browser.tabs.update(sender.tab.id, {url: message.url}).then(tab => {
+					console.log(script);
+					if (script) browser.tabs.executeScript(tab.id, {code: script});
+				});
+			}	
+			
+			break;
+		
+				
 	}
 	
 }
 
-chrome.runtime.onMessage.addListener(handleMessage);
+browser.runtime.onMessage.addListener(handleMessage);

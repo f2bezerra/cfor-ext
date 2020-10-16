@@ -167,7 +167,7 @@ if (editor) {
 	}
 
 	//interpretar campos %desc_cpfj_int%, %cpfj_int%, %desc_cpfj_dest%, %cpfj_dest%
-	html = html.replace(/%(desc_)?cpfj_(int|dest)(?:@?(\*))?%/ig, (m0, prefix, sufix, format) => {
+	html = html.replace(/%(desc_)?cpfj_(int|dest)(?:@?(\*))?%/ig, (m0, prefix, sufix, format = "") => {
 		let value;
 		
 		if (sufix.toLowerCase() == "int") {
@@ -251,7 +251,7 @@ if (editor) {
 		
 		if (format && value) {
 			format = format.toLowerCase().trim();
-			switch (m1) {
+			switch (name) {
 				case "sei": 
 					if (format == "link") value = `<span data-cke-linksei="1" style="text-indent:0px;" contenteditable="false"><a id="lnkSei${references.protocolo}" class="ancoraSei" style="text-indent:0px;">${value}</a></span>`;
 					break;
@@ -621,4 +621,32 @@ if (editor) {
 		
 	});
 	
-} 
+} else {
+	
+		waitDocumentReady(`iframe`, 'body[contenteditable=true]').then(doc => {
+			
+			//arrastar e soltar link de documento SEI
+			$(doc.body).on("dragover", e => {
+				e.preventDefault();
+				let link_id = e.originalEvent.dataTransfer.getData("sei/link-id");
+				if (link_id) return false;
+			}).on("drop", e => {
+				let link_id = e.originalEvent.dataTransfer.getData("sei/link-id");
+				
+				if (link_id) {
+					let sei_number = e.originalEvent.dataTransfer.getData("sei/number");
+			
+					e.preventDefault();
+					let sel = doc.getSelection();
+					let range = sel.getRangeAt(sel.rangeCount-1);
+					let $node = $(`<span data-cke-linksei="1" style="text-indent:0px;" contenteditable="false">SEI nº <a id="lnkSei${link_id}" class="ancoraSei" style="text-indent:0px;">${sei_number}</a></span>`);
+					range.deleteContents();
+					range.insertNode($node[0]);
+					range.collapse();
+					return false;
+				}
+			});
+			
+		});	
+	
+}

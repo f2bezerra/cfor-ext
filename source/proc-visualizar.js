@@ -15,17 +15,24 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 	
 	$.get(url, function(data) {
 		let $html = $(data);
+		let m_tipo; 
 		var processo = {};
 		if (!processo.numero) processo.numero = $(".infraArvore > a > span[id^='span']").text().replace(/\D/g, '').substr(0,15);
-		processo.tipo = $html.find("#selTipoProcedimento option[selected='selected']").text();
+		let tipo_processo = $html.find("#selTipoProcedimento option[selected='selected']").text();
 		processo.descricao = $html.find('#txtDescricao').val() || "(Não informado)";
+		processo.descricao = processo.descricao.replace(/(?:\s*-\s*)?(?:\s*se?r?[viçco]*:)?\s*\b\d{1,3}\s*$/i, "");
 
-		processo.servico = parseServicoByTipo(processo.tipo);
+		processo.servico = parseServicoByTipo(tipo_processo);
 		if (!processo.servico) processo.servico = parseServicoByText($html.find("#txtDescricao").val());
 		if (!processo.servico) processo.servico = {num: "000", desc: "desconhecido"};
 		
-		if (processo.tipo.match(/cassação/i)) processo.tipo = "Cassação";
-		else processo.tipo = processo.tipo.substring(0, processo.tipo.indexOf(":"));
+		processo.tipo = null;
+		if (tipo_processo.match(/cassação/i)) processo.tipo = "CS";
+		else if (tipo_processo.match(/\bradiodifusão\b.*?:/i)) processo.tipo = "RD";
+		else if (tipo_processo.match(/\s*pessoal\s*:/i)) processo.tipo = "PS";
+		else if (tipo_processo.match(/\s*autorização\b.*?radiofrequência\s*/i)) processo.tipo = "RF";
+		else if (processo.servico) processo.tipo = processo.servico.tipo;
+		
 		
 		
 		var $first = $html.find("#selInteressadosProcedimento option:first");
@@ -42,9 +49,12 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 		var divDt =	$("<div id='panelDetails' class='proc-panel div-editable'/>")
 					.insertAfter("#frmArvore")
 					.append(`<p class="nowrap"><label>Processo: </label><span class='actionable'>${processo.numero}</span></p>`)
-					.append(`<p class="nowrap"><label>Tipo: </label><span>${processo.tipo}</span></p>`)
-					.append(`<p class="nowrap"><label>Descrição: </label><span>${processo.descricao}</span></p>`)
-					.append(`<p class="nowrap"><label>Serviço: </label>${Number(processo.servico.num)?'<span>' + processo.servico.num + " - " + processo.servico.desc + '</span>':'<span style="color:#f00;">000 - Desconhecido</span>'}</p>`);
+					.append(`<p class="nowrap"><label>Tipo: </label><span>${getDescTipoProcesso(processo.tipo)}</span></p>`)
+					.append(`<p class="nowrap"><label>Descrição: </label><span>${processo.descricao}</span></p>`);
+					
+		if (processo.tipo !== "Pessoal") divDt.append(`<p class="nowrap"><label>Serviço: </label>${Number(processo.servico.num)?'<span>' + processo.servico.num + " - " + processo.servico.desc + '</span>':'<span style="color:#f00;">000 - Desconhecido</span>'}</p>`);
+		
+
 					
 		var obs = $html.find("#txaObservacoes").val();
 		var fields = fieldsFromString(obs);
@@ -54,7 +64,7 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 		else divDt.append(`<p><label>Interessado: </label>${processo.interessados.toString()}</p>`);
 		
 		if (Number(processo.servico.num)) divDt.append(`<input type="hidden" id="hdnServico" value="${processo.servico.num}" text="${processo.servico.desc}">`);
-		divDt.append(`<input type="hidden" id="hdnTipoProcesso" value="${processo.tipo}">`);
+		divDt.append(`<input type="hidden" id="hdnTipoProcesso" value="${processo.tipo}" text="${getDescTipoProcesso(processo.tipo)}">`);
 		if ($first.length && (m = $first.text().match(/^\s*(.*?)\(([^)]*?)\)\s*$/i))) divDt.append(`<input type="hidden" id="hdnInteressadoPrincipal" value="${m[2]}" text="${m[1]}">`);
 		
 		applyActionPanel('.actionable');
@@ -165,24 +175,26 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 				return updateFormSEI(url, "frmProcedimentoCadastro", "btnSalvar", function(doc) {
 					servico = servico && Number(servico);
 					let curr_servico = Number($('#hdnServico').val() || 0);
+					let curr_tipo = $('#hdnTipoProcesso').val();
 					//--- selecionar tipologia de acordo com o novo serviço
 					if (servico != curr_servico) {
-						let tipo_regex = getTipoRegexByServico(servico);
-						if (opt = $(doc).find("#selTipoProcedimento option").get().find(item => tipo_regex.test($(item).text()))) {
-							$(doc).find('#selTipoProcedimento').val($(opt).val());
-							$(doc).find('#hdnIdTipoProcedimento').val($(opt).val());
-							$(doc).find('#hdnNomeTipoProcedimento').val($(opt).text());
-							
-							$('#hdnServico').val(servico).attr("text", getDescServico(servico));
-							tipo_changed = true;
+						
+						if (curr_tipo == "LC") {
+							let tipo_regex = getTipoRegexByServico(servico);
+							if (opt = $(doc).find("#selTipoProcedimento option").get().find(item => tipo_regex.test($(item).text()))) {
+								$(doc).find('#selTipoProcedimento').val($(opt).val());
+								$(doc).find('#hdnIdTipoProcedimento').val($(opt).val());
+								$(doc).find('#hdnNomeTipoProcedimento').val($(opt).text());
+								
+								tipo_changed = true;
+							}
+						} else {
+							if (servico) $(doc).find("#txtDescricao").val(descricao + " - Serviço: " + servico);
+							else $(doc).find("#txtDescricao").val(descricao);
+							desc_changed = true;
 						}
-					}
-					
-					if (txt_desc = descricao) {
-						if (servico) servico = Number(servico);
-						if (servico >= 251 && servico <= 255) txt_desc += " - " + servico;
-						$(doc).find("#txtDescricao").val(txt_desc);
-						desc_changed = true;
+						
+						$('#hdnServico').val(servico).attr("text", getDescServico(servico));
 					}
 
 					$(doc).find("#txaObservacoes").val(fieldsToString(fields, true));
@@ -206,7 +218,7 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 			
 		};		
 		
-		const CFOR_FIELDS = "Fistel,Entidade,CPF,CNPJ,Fistel Principal,Usuário SEI,Indicativo,Embarcação,COER,Proprietário Anterior";
+		const CFOR_FIELDS = "Fistel,Entidade,CPF,CNPJ,Fistel Principal,Usuário SEI,Indicativo,Embarcação,COER,Proprietário Anterior,Outorga";
 		
 		$(divDt).dropable((data, event) => {
 			let default_name = "";
@@ -231,7 +243,7 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 			let temp_field = event.ctrlKey;
 			
 			openFormDlg([{id: "name", type: "text", label: "Nome", value: default_name, items: CFOR_FIELDS.split(","), required: true},
-						 {id: "value", type: "text", label: "Valor", value: data, required: false}], "Incluir campo" + (temp_field?" temporário":""), "Salvar", v => {
+						 {id: "value", type: "text", label: "Valor", value: data, required: false}], "Incluir campo" + (temp_field?" temporário":"") + " [Salvar]", v => {
 							if ($(`.proc-field[field-name="${identityNormalize(v.data.name)}"]`).length) {
 								v.target = "name";
 								v.message = "Nome de campo existente";
@@ -302,10 +314,10 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 								let curr_serv = $('#hdnServico').val();
 								let curr_desc = (desc = $(divDt).find('p:contains("Descrição:") span').get(0)) && $(desc).text().replace(/\(N[aã]o informado\)/i, "");
 								
-								openFormDlg([{id: "servico", type: "select", label: "Serviço", items: "019,251,252,253,254,255,302,400,507,604", value: curr_serv},
+								openFormDlg([{id: "servico", type: "select", label: "Serviço", items: "000,001,002,019,251,252,253,254,255,302,400,507,604", value: curr_serv},
 											 {id: "descricao", type: "text", label: "Descrição", value: curr_desc, items: "Pedido Inicial,Nova Autorização de RF,Renúncia,Exclusão,Alteração,Autocadastramento,Mudança de Proprietário,Inclusão de Estação"},
 											 {id: "fields", type: "textarea", rows: 7, cols: 50, label: "Campos do processo", value: fieldsToString(fields), intellisense: intellisense_options, autofocus: true}], 
-											 "Detalhes do processo", "Salvar").then(data => save_details(fieldsFromString(data.fields), data.servico, data.descricao));
+											 "Detalhes do processo [Salvar]").then(data => save_details(fieldsFromString(data.fields), data.servico, data.descricao));
 							}
 		});
 		
@@ -329,13 +341,13 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 				
 			var current_a = this;
 			var doc_id = current_a.id.match(/\d+$/);
-			if (url_alterar_recebido = (new RegExp(`controlador\\.php\\?acao=documento_alterar_recebido&[^"]+id_documento=${doc_id}[^"]+`, "i")).exec(html)) {
+			if (url_alterar_recebido = (new RegExp(`controlador\\.php\\?acao=documento_alterar(?:_recebido)?&[^"]+id_documento=${doc_id}[^"]+`, "i")).exec(html)) {
 				openFormDlg([{id: "acesso", type: "radio", label: "Informe nível de acesso", items: ["Restrito (Pessoal)", "Público"], vertical: true, value: 0},
 							 {id: "desc", type: "text", label: "Descrição do documento", width: 300, autofocus: true, items: desc_items, value: desc},
-							 {id: "orienta", type: "check", label: "Opções", text: "Registrar orientação ORLE para restrição", value: localStorage.orientacao_orle != undefined?localStorage.orientacao_orle:true}], 
-							 "Alteração", "Confirmar").then(data => {
+							 {id: "fund_restrito", type: "check", label: "Opções", text: "Registrar fundamento LGPD", value: localStorage.fund_restrito != undefined?localStorage.fund_restrito:true}], 
+							 "Alteração [Confirmar]").then(data => {
 						
-						localStorage.orientacao_orle = data.orienta;	
+						localStorage.fund_restrito = data.fund_restrito;	
 						
 						waitMessage("Atualizando nível de acesso...");
 						updateFormSEI(url_alterar_recebido, "frmDocumentoCadastro", "btnSalvar", function (doc) {
@@ -348,7 +360,7 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 									if ($selHipo = $(doc).find("#selHipoteseLegal")) $selHipo.val(34);
 									else return false;
 									
-									if (data.orienta) $(doc).find("#txaObservacoes").val("Por orientação da ORLE, documento de identificação de pessoa física com informação biométrica, endereço de pessoa física e números de CPF ou RG, são informações pessoais, assim como, de acordo com a CGU, data de nascimento, e-mail pessoal e número de telefone fixo/móvel pessoal.");
+									if (data.fund_restrito) $(doc).find("#txaObservacoes").val("Com base na LGPD, documento de identificação de pessoa física com informação biométrica, endereço de pessoa física, números de CPF ou RG, assim como, data de nascimento, e-mail pessoal e número de telefone fixo/móvel pessoal são informações pessoais.");
 								} else return false;
 							}
 							
@@ -393,7 +405,7 @@ if ((html = $('head').html()) && (url_anota = html.match(/controlador\.php\?acao
 			$("#frmArvore").parent().append($panel);
 		}
 		
-		if (content = $html.find('#txaDescricao').val()) $panel.css('display', 'block').find('span').html(content.replace(/\n/g, "<br>"));
+		if (content = parseNoteTags($html.find('#txaDescricao').val())) $panel.css('display', 'block').find('span').html(content.replace(/\n/g, "<br>"));
 		else $panel.css('display', 'none');
 		
 		if ($html.find('#chkSinPrioridade').is(':checked')) $panel.addClass("proc-panel-notes-hp");

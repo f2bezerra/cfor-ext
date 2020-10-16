@@ -179,7 +179,7 @@ function raiseErrorPromise(error) {
 	if (error.html && (alert_msg = getReturnAlert(error.html))) return Promise.reject(alert_msg);
 	
 	if (error.message) return Promise.reject(error.message);
-	if (error.statusText) return Promise.reject(error.statusText);
+	if (error.statusText) return Promise.reject(error.statusText == "error"?"Falha de conexão.\nSe estiver fora da rede da Agência, verificar sua conexão VPN.":error.statusText);
 	
 	return Promise.reject(error);
 }

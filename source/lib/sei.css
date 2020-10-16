@@ -20,6 +20,24 @@ a.botaoSEI img:hover {
 	background: linear-gradient(to bottom, #04bdff 0%, #04a5de 50%, #0481ad 100%);
 }
 
+/*** TAGS CONTROLE ***/
+.umi-tag,
+.ppc-tag {
+	color: #ff5722;
+}
+
+.umi-tag::before {
+	content: '\1f4c5' '\a0';
+}
+
+.ppc-tag::before {
+	color: #000;
+	content: '\25b8' '\1f3f4' '\a0';
+}
+
+
+
+
 /*** BOTÃO DE MENU ***/
 
 .btn-group-dropdown .botaoSEI img {

@@ -15,7 +15,7 @@ document.getElementById("ifrVisualizacao").addEventListener("load", function() {
 		if (predata.upload) predata.autoconfirm = false;
 	} else {
 		document.getElementById("ifrVisualizacao").style.visibility = "visible";
-		predata = {};
+		predata = {empty: true};
 	}
 
 	
@@ -116,7 +116,7 @@ document.getElementById("ifrVisualizacao").addEventListener("load", function() {
 		}
 	}
 	
-	if (($optNato = $(docV).find("#optNato")) && $optNato.is(":visible")) {
+	if (!predata.empty && ($optNato = $(docV).find("#optNato")) && $optNato.is(":visible")) {
 		$optNato.get(0).checked = true;
 		$optNato.trigger("click");
 	}
@@ -189,7 +189,7 @@ document.getElementById("ifrVisualizacao").addEventListener("load", function() {
 		let ifrA = document.getElementById("ifrArvore");
 		let docA = ifrA.contentDocument || ifrA.contentWindow.document;
 		let is_rd = false;
-		if (inputTipoProcesso = docA.getElementById("hdnTipoProcesso")) is_rd = ($(inputTipoProcesso).val().toLowerCase() == "radiodifusão");
+		if (inputTipoProcesso = docA.getElementById("hdnTipoProcesso")) is_rd = ($(inputTipoProcesso).val().toLowerCase() == "RD");
 		
 		if (is_rd) {
 			selAssuntos.add(new Option("280.3 - LICENCIAMENTO DE ESTAÇÕES DE RADIODIFUSÃO", "551"));
@@ -215,7 +215,7 @@ document.getElementById("ifrVisualizacao").addEventListener("load", function() {
 	
 	if (($optPublico = $(docV).find("#optPublico")) && $optPublico.is(":visible") && (selHipo = docV.getElementById("selHipoteseLegal"))) {
 		$optPublico.on("change", function (e) {
-			let obs = $(docV).find("#txaObservacoes").val().replace(/por orien.+\bORLE\b[^.]+\.\n*/ig,"");
+			let obs = $(docV).find("#txaObservacoes").val().replace(/com base na LGPD\b[^.]+\.\n*/ig,"");
 			$(docV).find("#txaObservacoes").val(obs);
 			$(selHipo).val(0);
 		});
@@ -225,8 +225,8 @@ document.getElementById("ifrVisualizacao").addEventListener("load", function() {
 	if (($optRestrito = $(docV).find("#optRestrito")) && $optRestrito.is(":visible") && (selHipo = docV.getElementById("selHipoteseLegal"))) {
 		
 		$(selHipo).on("change", function (e) {
-			let obs = $(docV).find("#txaObservacoes").val().replace(/por orien.+\bORLE\b[^.]+\.\n*/ig,"").replace(/^[\n\r\s]+|[\n\r\s]+$/g, "");
-			if (selHipo.value == 34) obs = "Por orientação da ORLE, documento de identificação de pessoa física com informação biométrica, endereço de pessoa física e números de CPF ou RG, são informações pessoais, assim como, de acordo com a CGU, data de nascimento, e-mail pessoal e número de telefone fixo/móvel pessoal." + (obs?"\n\n":"") + obs;
+			let obs = $(docV).find("#txaObservacoes").val().replace(/com base na LGPD\b[^.]+\.\n*/ig,"").replace(/^[\n\r\s]+|[\n\r\s]+$/g, "");
+			if (selHipo.value == 34) obs = "Com base na LGPD, documento de identificação de pessoa física com informação biométrica, endereço de pessoa física, números de CPF ou RG, assim como, data de nascimento, e-mail pessoal e número de telefone fixo/móvel pessoal são informações pessoais." + (obs?"\n\n":"") + obs;
 			$(docV).find("#txaObservacoes").val(obs);
 		});
 		
@@ -270,27 +270,45 @@ document.getElementById("ifrVisualizacao").addEventListener("load", function() {
 	docV.getElementById("ifrArvoreHtml").addEventListener("load", function() {
 		
 		//LABORATORIO DE TESTES
-/* 		addCommand("btnLab", "lab.svg", "Teste de Novidades", null, async e => {
-			//let info = getCurrentProcInfo();
+ 		// addCommand("btnLab", "lab.svg", "Teste de Novidades", null, async e => {
+			// // let info = getCurrentProcInfo();
 			
-			// if (!info.cpfj) {
-				// errorMessage("CPF/CNPJ do interessado não informado.\n\nInforme no próprio cadastro do interessado **ou** inclua um campo CPF no processo.", "RA");
-				// return;
-			// }
+			// // if (!info.cpfj) {
+				// // errorMessage("CPF/CNPJ do interessado não informado.\n\nInforme no próprio cadastro do interessado **ou** inclua um campo CPF no processo.", "RA");
+				// // return;
+			// // }
 			
-			// waitMessage("Consultando...");
-			// consultarUrlServico(604, info.cpfj).then(url => chrome.runtime.sendMessage({action: "open", url: [url]})).finally(() => waitMessage(null)).catch(error => errorMessage(error, "Móvel Aeronáutico"));
-			// consultarUsuarioExterno(info.nome);
+			// // waitMessage("Consultando...");
 			
-			// if (!info.cpf) return errorMessage("CPF do interessado não informado.\n\nInforme no próprio cadastro do interessado **ou** inclua um campo CPF no processo.", "PX");
+			// // // consultarUrlServico(604, info.cpfj).then(url => chrome.runtime.sendMessage({action: "open", url: [url]})).finally(() => waitMessage(null)).catch(error => errorMessage(error, "Móvel Aeronáutico"));
+			// // // consultarUsuarioExterno(info.nome);
 			
-			// autorizarPX(info.cpf, info.processo).then(data => {
-				// waitMessage("Atualizando campos...");
-				// storeFields([{name: "Fistel", value: data.fistel}, {name: "Indicativo", value: data.indicativo}], true).then(html => console.log('ok')).catch(err => console.log(err)).finally(() => waitMessage(null));
-			// });
-			// captureNextProcesso(e);
-		});
- */		
+			// // if (!info.cpf) return errorMessage("CPF do interessado não informado.", "PX");
+			
+			// // consultarEntidade(info.cpf).then(cadastro => {
+				// // waitMessage(null);
+				// // let msg = `@@**Entidade:** ${cadastro.nome.toUpperCase()}\n`;
+				
+				// // if (info.cpf) msg += `**CPF:** ${cpfjReadable(cpfj)}\n**Identidade:** ${cadastro.rg}/${cadastro.expedidor}\n**Data de Nascimento:** ${cadastro.nascimento}\n`;
+				// // else msg += `**CNPJ:** ${cpfjReadable(cpfj)}\n`;
+				
+				// // msg += `**E-Mail:** ${cadastro.email?cadastro.email:""}\n**Endereço${info.cnpj?" Sede":""}:** ${cadastro.logradouro}${cadastro.num?", " + cadastro.num:""}${cadastro.complemento?", "+cadastro.complemento:""}${cadastro.bairro?", "+cadastro.bairro:""}\n` +
+					   // // `**Município:** ${cadastro.municipio}/${cadastro.uf}\n**CEP:** ${cadastro.cep}@@`;
+				// // popupMessage(msg, "Consulta");
+				
+			// // }).catch(error => {
+				// // waitMessage(null);
+				// // errorMessage(error, "Consulta")
+			// // });			
+			
+			
+			// // autorizarPX(info.cpf, info.processo).then(data => {
+				// // waitMessage("Atualizando campos...");
+				// // storeFields([{name: "Fistel", value: data.fistel}, {name: "Indicativo", value: data.indicativo}], true).then(html => console.log('ok')).catch(err => console.log(err)).finally(() => waitMessage(null));
+			// // });
+			// // captureNextProcesso(e);
+		// });
+ 		
 		
 		var doc = this.contentDocument || this.contentWindow.document;
 
@@ -352,8 +370,11 @@ document.getElementById("ifrVisualizacao").addEventListener("load", function() {
 								errorMessage("Serviço indefinido!");
 								return;
 							}
+							let value = mp[3].replace(/\D/g,"").substring(0,15) + ";" + servico + ";" + fs;
+							setClipboard(value);
+							notify("success", "Campos atualizados\n" + value);
 								
-							addControlePagto(fs, mp[3], servico, debitos, nm);
+							//addControlePagto(fs, mp[3], servico, debitos, nm);
 						});
 						
 						var img = document.createElement("img");

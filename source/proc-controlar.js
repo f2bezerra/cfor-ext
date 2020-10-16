@@ -17,7 +17,7 @@ function updateTable(tb) {
 	}
 	
 	
-	let regex = /(DDE|UMI|STATUS):((\d{2})\/(\d{2})\/(\d{4})|[^;]+);|(PAGOU?|PPDESS\s+Venc(?:ido|eu))/ig;
+	let regex = /(DDE|UMI|STATUS):((\d{2})\/(\d{2})\/(\d{4})|[^;]+);|(PAGOU?|PPDESS\s+Venc(?:ido|eu))|(\w{3}:.*?;)/ig;
 	
 	let $rows = $(tb + " tbody tr:gt(0)").each((index, row) => {
 		let $col_umi;
@@ -47,10 +47,18 @@ function updateTable(tb) {
 					case "status":
 						row.status = m[2].toLowerCase();
 				}
-			} else {
+				row.has_tags = true;
+			} else if (m[6]) {
 				row.status = m[6].toLowerCase();
-			}
+			} else row.has_tags = true;
 		}
+		
+		if (row.umi || row.has_tags) {
+			//note = note.replace(/UMI:(.*?);/i, '<span class="umi-tag">$1</span>');
+			note = parseNoteTags(note);
+			
+			$anchor.attr("onmouseover", note);
+		} 
 
 		if (row.status.substr(0,4) == "pago") {
 			row.status = 1;
@@ -240,7 +248,7 @@ addCommand("btnUMI", "date-in.png", "Determinar data da última manifestação d
 
 
 //Criar botão de captura
-addCommand("btnGetProc", "get-proc.png", "Capturar processo para análise", null, captureProcesso);
+addCommand("btnGetProc", "get-proc.png", "Assumir processo para análise", null, captureProcesso);
 
 updateTable("#tblProcessosRecebidos");
 updateTable("#tblProcessosGerados");

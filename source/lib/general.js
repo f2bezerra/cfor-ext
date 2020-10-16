@@ -830,9 +830,10 @@ function postFormData(form_url, options) {
 /*** Aguardar carregamento de documento ***
 
 		doc: documento para aguardar carregamento :: <id> | <document> | <iframe> | <window>
-		options: opções para aguardar :: {interval, timeout}
+		options: opções para aguardar :: {interval, timeout, filter} | filter 
 			interval: intervalo de verificação do estado do documento. Padrão 250 ms :: <number>
 			timeout: tempo limite para aguardar a carga do documento. Padrão 15000 ms :: <number> 
+			filter: filtro para documento :: <function> | <string>. 
 		
 		return Promise
 */
@@ -843,24 +844,44 @@ function waitDocumentReady(doc, options) {
 						   timeout: 15000};			//--- timeout (ms) de aguardo da carga
 						   
 	if (!options) options = {}; 
+	if (typeof options == "string" || typeof options == "function") options = {filter: options};
 	if (typeof options == "number") options = {timeout: options};
 	
 	for (let prop in default_options) if (default_options.hasOwnProperty(prop) && default_options[prop] != undefined && options[prop] == undefined) options[prop] = default_options[prop];
 	
-	var getdoc = function(d) {
+/* 	var get_doc = (d) => {
 		if (d instanceof Document) return d;
 		if (typeof d == "string") {if (!(dtemp = $(d).get(0))) return d; else d = dtemp;}
 		if (d instanceof Element && d.tagName == "IFRAME" && (a = d.contentDocument || d.contentWindow.document) && (a.readyState != "uninitialized")) return a;
 		if (d instanceof Window) return d.document;
 		return d;
 	};
+ */	
+	var get_doc = (d) => {
+		if (d instanceof Document) return d;
+		if (d instanceof Window) return d.document;
+		
+		d = $(d).get().find(tmp => {
+			if (tmp instanceof Element && tmp.tagName == "IFRAME") tmp = tmp.contentDocument || tmp.contentWindow.document;
+			if (!tmp instanceof Document || tmp.readyState != "complete") return false;
+			if (!options.filter) return true;
+			if (typeof options.filter == "function") return options.filter(tmp);
+			return tmp.querySelector(options.filter) != null;
+		});
+		
+		if (!d) return null;
+		if (d instanceof Document) return d;
+		if (d instanceof Window) return d.document;
+		if (d instanceof Element && d.tagName == "IFRAME") return d.contentDocument || d.contentWindow.document;
+		return d;
+	};	
 	
 	return new Promise(function(resolve, reject) {
 		var counter = 0, ready_interval = setInterval(function() {
 			counter++;
-			doc = getdoc(doc);
+			let d = get_doc(doc);
 			
-			if (doc.readyState != "complete") {
+			if (!d || d.readyState != "complete") {
 				if (options.timeout && (counter*options.interval >= options.timeout)) {
 					clearInterval(ready_interval);
 					reject("Timeout");
@@ -869,7 +890,7 @@ function waitDocumentReady(doc, options) {
 			}
 			
 			clearInterval(ready_interval);
-			resolve(doc);
+			resolve(d);
 		}, options.interval);
 	});
 }
@@ -1612,7 +1633,7 @@ function openDlg(dlg, options) {
 		
 		return <string>
 */
-function parseMarkdown(text, base) {
+function parseMarkdown(text) {
 	if (!text) return "";
 	text = text.replace(/\*\*([^\s].*?[^\s]|[^\s])\*\*/g, "<strong>$1</strong>");
 	text = text.replace(/__([^\s].*?[^\s]|[^\s])__/g, "<em>$1</em>");
@@ -1676,7 +1697,7 @@ function stringToDlgOptions(settings) {
 		if (!options.buttons) options.buttons = [];
 		
 		last_btn = btn_name;	
-		if (btn_default) options.defaultButton = btn_default;
+		if (btn_default) options.defaultButton = btn_name;
 		
 		if (btn_class === "confirm") options.confirmButton = btn_name;
 		else if (btn_class === "cancel") options.cancelButton = btn_name;
@@ -1685,6 +1706,8 @@ function stringToDlgOptions(settings) {
 		
 		return "";
 	});
+	
+	if (options.buttons && options.buttons.length == 1 && !options.defaultButton) options.defaultButton = options.buttons[0];
 	
 	//--- title
 	settings = settings.trim();
@@ -2101,9 +2124,6 @@ function openFormDlg(fields, title, options, validation) {
 		validation = options;
 		options = title;
 		title = undefined;
-	} else if (typeof title == "string" && !options) {
-		options = stringToDlgOptions(title);
-		title = undefined;
 	}
 
 	if (typeof options == 'function') {
@@ -2112,8 +2132,15 @@ function openFormDlg(fields, title, options, validation) {
 	} else if (typeof options == 'string') options = stringToDlgOptions(options);
 	
 	if (typeof validation != "function") validation = undefined;
+	
+	if (typeof title == "string" && !options) {
+		options = stringToDlgOptions(title);
+		title = undefined;
+	}	
 		
 	if (!options) options = {};
+
+	if (!options.confirmButton && options.buttons && options.buttons.length == 1) options.confirmButton = options.buttons[0];
 	
 	//--- aplicação de opções padrões
 	var default_options = {title: title?title:"Formulário",	// título da janela

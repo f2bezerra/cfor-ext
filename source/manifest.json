@@ -73,10 +73,13 @@
 						 "all_frames": true,
 						 "js": ["proc-alterar.js"]},
 						 
-						{"matches": ["*://cfor.freevar.com/cpag/*"],
-						 "all_frames": true,
-						 "css": ["lib/general.css", "lib/animation.css"],
-						 "js": ["lib/jquery.min.js", "lib/general.js", "cpag/cpag-functions.js", "cpag/cpag-browser.js"]}						 
+						{"matches": ["*://*.anac.gov.br/SACI/Index.asp"],
+						 "js": ["lib/jquery.min.js", "externo/anac.js"]},
+
+						{"matches": ["*://*.anac.gov.br/SACI/SIAC/Aeronave/Estacao/Consulta.asp"],
+						 "js": ["lib/jquery.min.js", "externo/siac.js"]}
+						 
+						 
 						 ],
 						 
 					 
