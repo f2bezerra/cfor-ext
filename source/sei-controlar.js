@@ -1,5 +1,20 @@
 ﻿$(function() {
 	
+	var lotacao = getCurrentLotacao();
+	if (lotacao && lotacao != "GR05OR") {
+		if (!document.baseURI.match(/controlador\.php\?acao=infra_configurar&.*/i)) {
+			if (anchor = top.window.document.getElementById('lnkConfiguracaoSistema')) {
+				browser.runtime.sendMessage({action: "navigate", url: absoluteUrl($(anchor).attr("href")), script: undefined});			
+				return;				
+			} else window.close();
+		} else {
+			$('#divInfraAreaTelaD').html(`
+				<h1 class="infraBarraLocalizacao"><img src="${browser.runtime.getURL('assets/logo-24.png')}"> Aviso Importante!</h1>
+				<h2>A extensão "cfor-ext" está habilitada apenas para a lotação <strong style="font-weight: 700;">GR05OR</strong>. <br><br> Altere a lotação ou desinstale a extensão!</h2>
+			`);
+		}
+	}
+	
 	const CURRENT_NEWS = 3;
 
 	if (!localStorage.cfor_lastnews || localStorage.cfor_lastnews < CURRENT_NEWS) {

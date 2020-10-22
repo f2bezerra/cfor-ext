@@ -125,24 +125,24 @@ function handleMessage(message, sender) {
 		}
 		
 			
-		case "runContentScript": 
-			browser.tabs.query({currentWindow: true}).then(tab => {
-				browser.tabs.executeScript(tab.id, {code: message.code});
-			});
+		case "runScript": {
+				let query_options = message.allTabs ? {currentWindow: true} : {};
+				browser.tabs.query(query_options).then(tabs => {
+					tabs.forEach(tab => {
+						browser.tabs.executeScript(tab.id, {allFrames: message.allFrames ? true : false, 
+															code: message.script,
+															runAt: message.runAt ? message.runAt : "document_idle"});
+					});
+				});
+			}
 			
 			break;
 
 			
-		case "navigate": {
-			if (!message.url) break;
-			
-				var script = message.script;
-			
-				browser.tabs.update(sender.tab.id, {url: message.url}).then(tab => {
-					console.log(script);
-					if (script) browser.tabs.executeScript(tab.id, {code: script});
-				});
-			}	
+		case "navigate": 
+			if (message.url) browser.tabs.update(sender.tab.id, {url: message.url}).then(tab => {
+				if (message.script) browser.tabs.executeScript(tab.id, {code: message.script});
+			});
 			
 			break;
 		

@@ -46,6 +46,29 @@ function getTipoRegexByServico(servico) {
 	return null;
 }
 
+//Retorna descrição da tipologia de acordo com o serviço
+function getDescTipologia(servico) {
+	
+	switch (Number(servico)) {
+		case 1: return "Outorga: Serviços de Interesse Coletivo";
+		case 2: return "Outorga: Serviços de Interesse Restrito";
+		case 19: return "Outorga: SLP";
+		case 251: 
+		case 252: 
+		case 253: 
+		case 254: 
+		case 255: return "Outorga: Serviços Auxiliares de Radiodifusão e Correlatos (SARC)";
+		case 302: return "Outorga: Radioamador";
+		case 400: return "Outorga: Rádio do Cidadão";
+		case 507: return "Outorga: Serviço Limitado Móvel Aeronáutico";
+		case 604: return "Outorga: Serviço Limitado Móvel Marítimo";
+	}
+	
+	
+	return null;
+}
+
+
 
 //Interpretar texto para identificar o serviço de telecomunicações
 function parseServicoByText(text) {
@@ -633,6 +656,14 @@ function getCurrentNode() {
 }
 
 
+//Retorna o número do processo atual
+function getCurrentProcesso() {
+	if ((arvore_doc = getFrameDocument("arvore")) && (proc = $(arvore_doc).find('#header a[id^=anchor]').text())) return proc.trim();
+	else if (proc = $('#header').find('a[id^=anchor]').text()) return proc.trim(); 
+	else return "";
+}
+
+
 //Retorna referência para o documento selecionado no processo
 function getCurrentReference(getDocument) {
 	if ((arvore_doc = getFrameDocument("arvore")) && (anchor = $(arvore_doc).find('.infraArvoreNoSelecionado').closest('a').get(0)) && (doc = $(anchor).text())) {
@@ -915,7 +946,7 @@ async function clearFields() {
 }
 
 
-//Atualizar campos do processo
+//Atualizar campos do processo atual
 async function refreshFields(fields) {
 	let doc = getFrameDocument("arvore");
 	
@@ -958,6 +989,12 @@ function getCurrentUser() {
 	return null;
 }
 
+
+//Retornar dados do usuário corrente {login,nome}
+function getCurrentLotacao() {
+	if (sel = top.window.document.getElementById('selInfraUnidades')) return $(sel).text().trim();
+	return null;
+}
 
 //Retornar informações do processo corrente
 function getCurrentProcInfo() {

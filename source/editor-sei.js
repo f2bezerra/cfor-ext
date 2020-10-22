@@ -326,7 +326,9 @@ if (editor) {
 	//---Função para aplicação dos testes de condicionamento
 	var apply_conditions = (html, defer_vars) => {
 		
-		let regex_undef = defer_vars ? /%\w+\(.*\)%|\$\w[\w_]*\b/i : /%\w+\(.*\)%/i;
+		//correção da expressão regular que define resultado indefinido
+		//let regex_undef = defer_vars ? /%\w+\(.*\)%|\$\w[\w_]*\b/i : /%\w+\(.*\)%/i;
+		let regex_undef = defer_vars ? /%\w+\(.+|\$\w[\w_]*\b/i : /%\w+\(.+/i;
 		let block_regex =  /(<p[^>]*?><code[^>]*?>{#if\s*([^}]*?)}<\/code><\/p>([\w\W]*?)?)(<p[^>]*?><code[^>]*?>{#if\s*[^}]*?}<\/code><\/p>[\w\W]*?)?(?:<p[^>]*?><code[^>]*?>{#else}<\/code><\/p>([\w\W]*?))?<p[^>]*?><code[^>]*?>{#endif}<\/code><\/p>/ig;
 		let inline_regex = /(<code[^>]*?>{#if\s*([^}]*?)}<\/code>(?!<\/p>)([\w\W]*?)?)(<code[^>]*?>{#if\s*[^}]*?}<\/code>[\w\W]*?)?(?:<code[^>]*?>{#else}<\/code>([\w\W]*?))?<code[^>]*?>{#endif}<\/code>/ig;
 		

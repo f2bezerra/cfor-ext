@@ -115,6 +115,7 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 				return updateFormSEI(url, "frmProcedimentoCadastro", "btnSalvar", function(doc) {
 					$(doc).find("#txaObservacoes").val(fieldsToString(fields, true));
 				}).then(() => {
+					/*
 					$(divDt).find('.proc-field').remove();
 					let last_p = $(divDt).find('p:contains("Interessado:"):last').get(0) || $(divDt).find('p:contains("Interessados:"):last').get(0) || $(divDt).find('p:last').get(0);
 					
@@ -122,6 +123,8 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 					applyActionPanel('.proc-field span')
 
 					$(divDt).get(0).removeCommand("icon-refresh");
+					*/
+					refresh_all_panels(fields);
 
 					updateArvore();
 					notify("success", "Campos atualizados");
@@ -130,6 +133,49 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 			});
 			
 		};
+		
+		
+		var refresh_all_panels = (fields, servico, descricao) => {
+			let proc = getCurrentProcesso();
+			
+			var script = `
+				if ((panel = $('#panelDetails').get(0)) && getCurrentProcesso() == "${proc}") {
+					$(panel).find('.proc-field').remove();
+					let last_p = $(panel).find('p:contains("Interessado:"):last').get(0) || $(panel).find('p:contains("Interessados:"):last').get(0) || $(panel).find('p:last').get(0);
+			`;
+			
+			if (servico != undefined) {
+				script += `
+				if (serv = $(panel).find('p:contains("Serviço:") span').get(0)) $(serv).text("${servico}" + " - " + getDescServico(${servico}));
+				if (span = $('#header').find('span[id^=span]').get(0)) $(span).attr("title", getDescTipologia(${servico}));
+				
+				$('#hdnServico').val(${servico}).attr("text", getDescServico(${servico}));
+
+				` + "\n";
+			} 
+			
+			if (descricao != undefined) {
+				script += `
+				if (desc = $(panel).find('p:contains("Descrição:") span').get(0)) $(desc).text("${descricao}"); 
+				`;
+			}
+			
+			if (fields) {
+				fields.forEach(f => {
+					script += `$(last_p).before($('<p class="proc-field" field-name="${identityNormalize(f.name)}"><label>${f.name}: </label><span class="actionable">${f.value}</span></p>'));` + "\n";
+				});
+				
+				script += `
+				applyActionPanel('.proc-field span');
+				$(panel).get(0).removeCommand("icon-refresh");
+				`;
+			}
+			
+			script += "}";
+			
+			browser.runtime.sendMessage({action: "runScript", allTabs: true, allFrames: true, script: script});
+		};
+		
 		
 		var save_details = (fields, servico, descricao) => {
 			let consultas = new Promise((resolve, reject) => {
@@ -176,31 +222,36 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 					servico = servico && Number(servico);
 					let curr_servico = Number($('#hdnServico').val() || 0);
 					let curr_tipo = $('#hdnTipoProcesso').val();
+					let new_desc = descricao;
 					//--- selecionar tipologia de acordo com o novo serviço
 					if (servico != curr_servico) {
 						
-						if (curr_tipo == "LC") {
+						if (curr_tipo == "LC" || curr_tipo == "OT") {
 							let tipo_regex = getTipoRegexByServico(servico);
 							if (opt = $(doc).find("#selTipoProcedimento option").get().find(item => tipo_regex.test($(item).text()))) {
 								$(doc).find('#selTipoProcedimento').val($(opt).val());
 								$(doc).find('#hdnIdTipoProcedimento').val($(opt).val());
 								$(doc).find('#hdnNomeTipoProcedimento').val($(opt).text());
-								
 								tipo_changed = true;
+								
+								if (Number(servico) >= 251 && Number(servico) <= 255) new_desc += " - Serviço: " + servico;
+								desc_changed = true;
 							}
 						} else {
-							if (servico) $(doc).find("#txtDescricao").val(descricao + " - Serviço: " + servico);
-							else $(doc).find("#txtDescricao").val(descricao);
+							if (servico) new_desc += " - Serviço: " + servico;
 							desc_changed = true;
 						}
 						
 						$('#hdnServico').val(servico).attr("text", getDescServico(servico));
 					}
-
+					$(doc).find("#txtDescricao").val(new_desc);
 					$(doc).find("#txaObservacoes").val(fieldsToString(fields, true));
-				}).then(() => {
+				}).then(() => { /*
 					if (desc_changed && (desc = $(divDt).find('p:contains("Descrição:") span').get(0))) $(desc).text(descricao); 
-					if (tipo_changed && (serv = $(divDt).find('p:contains("Serviço:") span').get(0))) $(serv).text(servico + " - " + getDescServico(servico)); 
+					if (tipo_changed) {
+						if (serv = $(divDt).find('p:contains("Serviço:") span').get(0)) $(serv).text(servico + " - " + getDescServico(servico)); 
+						if (span = $('#header').find('span[id^=span]').get(0)) $(span).attr("title", getDescTipologia(servico));
+					}
 					
 					$(divDt).find('.proc-field').remove();
 					let last_p = $(divDt).find('p:contains("Interessado:"):last').get(0) || $(divDt).find('p:contains("Interessados:"):last').get(0) || $(divDt).find('p:last').get(0);
@@ -209,6 +260,10 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 					applyActionPanel('.proc-field span')
 
 					$(divDt).get(0).removeCommand("icon-refresh");
+					
+					*/
+					
+					refresh_all_panels(fields, tipo_changed ? servico : undefined, desc_changed ? descricao : undefined);
 
 					updateArvore();
 					notify("success", "Processo atualizado");

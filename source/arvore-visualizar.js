@@ -552,6 +552,7 @@ function addFuncoesAnatel() {
 			// items.push("-", {text: "Radioamador", items: [{id: "ra_cons", text: "Consultar Serviço", icon: "extension://assets/consulta.svg"}, "-",
 														  // {id: "ra_pi", text: "Incluir Serviço e Estação", icon: "extension://assets/pxra.svg"}]});
 			items.push({id: "ra_cons", text: "Consultar Serviço", icon: "extension://assets/consulta.svg"});
+			items.push("-", {id: "ra_pi", text: "Incluir Serviço e Estação", icon: "extension://assets/pxra.svg"});
 			break;
 		case 400:
 			// items.push("-", {text: "PX", items: [{id: "px_cons", text: "Consultar Serviço", icon: "extension://assets/consulta.svg"}, "-",
