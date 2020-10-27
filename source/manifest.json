@@ -1,7 +1,7 @@
 {
 	"manifest_version": 2,
 	"name": "cfor-ext",
-	"version": "3.1.0",
+	"version": "3.1.5",
 	"author": "Fabio Fernandes Bezerra",
 	"description": "Extensão de funcionalidades do SEI",
 	
@@ -77,8 +77,10 @@
 						 "js": ["lib/jquery.min.js", "externo/anac.js"]},
 
 						{"matches": ["*://*.anac.gov.br/SACI/SIAC/Aeronave/Estacao/Consulta.asp"],
-						 "js": ["lib/jquery.min.js", "externo/siac.js"]}
+						 "js": ["lib/jquery.min.js", "externo/siac.js"]},
 						 
+						{"matches": ["*://sistemasnet/*/VersaoImpressao*"],
+						 "js": ["lib/jquery.min.js", "externo/consulta-proteger.js"]}
 						 
 						 ],
 						 

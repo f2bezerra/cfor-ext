@@ -110,14 +110,14 @@ function addNovo() {
 				case "boletos": 
 					url = $html.find("[data-desc='oficio'] .ancoraOpcao").attr("href");
 					predata.txtpad = "O-Boletos";
-					predata.acesso = "auto";
+					predata.acesso = 2;
 					predata.autoconfirm = true;
 					break;
 					
 				case "licenca": 
 					url = $html.find("[data-desc='oficio'] .ancoraOpcao").attr("href");
 					predata.txtpad = "O-Licença";
-					predata.acesso = "auto";
+					predata.acesso = 2;
 					if (reference && reference.tipo == "licenca") predata.reference = reference;
 					predata.autoconfirm = true;
 					break;
@@ -242,7 +242,7 @@ function addNovo() {
 					url = $html.find("[data-desc*=externo] .ancoraOpcao").attr("href");
 					predata.tipo = "Extrato";
 					predata.desc = "de Lançamentos";
-					predata.acesso = "auto";
+					predata.acesso = 2;
 					predata.upload = true;
 					break;
 					
@@ -250,7 +250,7 @@ function addNovo() {
 					url = $html.find("[data-desc*=externo] .ancoraOpcao").attr("href");
 					predata.tipo = "Relatório";
 					predata.desc = "de Sistema";
-					predata.acesso = "auto";
+					predata.acesso = 2;
 					predata.upload = true;
 					break;
 
@@ -258,7 +258,7 @@ function addNovo() {
 					url = $html.find("[data-desc*=externo] .ancoraOpcao").attr("href");
 					predata.tipo = "Registro";
 					predata.desc = "de Chamado para Suporte de TI";
-					predata.acesso = "auto";
+					predata.acesso = 1;
 					predata.upload = true;
 					break;
 
@@ -266,7 +266,7 @@ function addNovo() {
 					url = $html.find("[data-desc*=externo] .ancoraOpcao").attr("href");
 					predata.tipo = "Licença";
 					if (info && info.indicativo) predata.desc =  info.indicativo;
-					predata.acesso = "auto";
+					predata.acesso = 2;
 					predata.upload = true;
 					break;
 					
@@ -274,7 +274,7 @@ function addNovo() {
 					url = $html.find("[data-desc*=externo] .ancoraOpcao").attr("href");
 					predata.tipo = "Certificado";
 					predata.desc = "de Operador de Estação de Radioamador";
-					predata.acesso = "auto";
+					predata.acesso = 1;
 					predata.upload = true;
 					break;
 					
@@ -307,13 +307,18 @@ function addAlterarDoc() {
 	
 	let anchor = getCurrentNode();
 
-	createPopupMenu(btn, [{id: "na_restrito", text: parseMarkdown("Alterar para Nível de Acesso **Restrito**"), icon: "menu-key-icon"},
+	createPopupMenu(btn, [{id: "na_restrito_pes", text: parseMarkdown("Alterar para Nível de Acesso **Restrito: Pessoal**"), icon: "menu-key-icon"},
+						  {id: "na_restrito_eco", text: parseMarkdown("Alterar para Nível de Acesso **Restrito: Econômica**"), icon: "menu-key-icon"},
+						  "-",
 	                      {id: "na_publico", text: parseMarkdown("Alterar para Nível de Acesso **Público**"), icon: "menu-share-icon"}], {dropButton: "menu-drop-button"}, async e => {
 		
-		if (!await confirmMessage(`Confirmar alteração do nível de acesso para **${e.id == "na_restrito" ? "RESTRITO" : "PÚBLICO"}**?`)) return;
+		let acesso = e.id == "na_publico" ? 0 : e.id == "na_restrito_pes" ? 1 : 2;
+		let str_acesso = ["Público", "Restrito (Info. Pessoal)", "Restrito (Info. Econômica)"];
+		
+		if (!await confirmMessage(`Confirmar alteração do nível de acesso para **${str_acesso[acesso].toUpperCase()}**?`)) return;
 		
 		waitMessage("Alterando nível de acesso...");
-		if (await alterarDocumento($(btn).attr('href'), anchor, null, e.id == "na_publico")) notify("success", "Nível de acesso alterado");
+		if (await alterarDocumento($(btn).attr('href'), anchor, null, acesso)) notify("success", `Nível de acesso alterado para\n ${str_acesso[acesso].toUpperCase()}!`);
 		else notify("fail", "Nível de acesso NÃO foi alterado");
 		waitMessage(null);
 	});							  

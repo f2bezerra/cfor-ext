@@ -478,10 +478,10 @@ $(function() {
 				if (default_table == "lancto" && default_fistel) {
 					default_data = "%extrato(" + default_fistel;
 					if (default_status) {
-						default_data += ", " +  default_status;
+						default_data += ";" +  default_status;
 						if (default_periodo) {
-							if (default_periodo[0]) default_data += ", {vencto} >= " + default_periodo[0];
-							if (default_periodo[1]) default_data += (default_periodo[0] ? " AND " : ", ") + "{vencto} <= " + default_periodo[1];
+							if (default_periodo[0]) default_data += "; {vencto} >= " + default_periodo[0];
+							if (default_periodo[1]) default_data += (default_periodo[0] ? " AND " : "; ") + "{vencto} <= " + default_periodo[1];
 						}
 					}
 					default_data += ")%";

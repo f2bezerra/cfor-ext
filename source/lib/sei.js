@@ -3,6 +3,7 @@
 /***********************************************/
 var browser = browser || chrome;
 
+
 //Interpretar tipologia de processo para identificar o serviço de telecomunicações
 function parseServicoByTipo(tipo) {
 	if (m = tipo.match(/(?:([^:]+)\s*:)?\s*(.+)\s*$/i)) {
@@ -589,8 +590,16 @@ function consultarUsuarioExterno(id) {
 
 
 //Alterar nível de acesso de documento
-async function alterarDocumento(url_doc_alterar, anchor_doc_alterar, descricao, acesso_publico) {
+async function alterarDocumento(url_doc_alterar, anchor_doc_alterar, descricao, acesso = 0) {
 	if (!url_doc_alterar) return Promise.reject("Endereço de alteração não informado");
+	
+	var acesso_publico = (acesso == 0);
+	var hipotese = 34;
+	
+	switch (acesso) {
+		case 1: hipotese = 34; break; //Informação pessoal
+		case 2: hipotese = 38; break; //Informação econômica
+	}
 
 	return updateFormSEI(url_doc_alterar, "frmDocumentoCadastro", "btnSalvar", function (doc) {
 		if (acesso_publico) {
@@ -605,12 +614,11 @@ async function alterarDocumento(url_doc_alterar, anchor_doc_alterar, descricao, 
 				$optRestrito.trigger("click");
 				$optRestrito.prop("checked", true);
 				if ($selHipo = $(doc).find("#selHipoteseLegal")) {
-					let hipotese = 34;
 					if (!$selHipo.find(`option[value=${hipotese}]`).length) $selHipo.append(`<option value="${hipotese}" />`)
 					$selHipo.val(hipotese);
 					$selHipo.trigger("change");
 					let obs = $(doc).find("#txaObservacoes").val().replace(/com base na LGPD\b[^.]+\.\n*/ig,"").replace(/^[\n\r\s]+|[\n\r\s]+$/g, "");
-					obs = "Com base na LGPD, documento de identificação de pessoa física com informação biométrica, endereço de pessoa física, números de CPF ou RG, assim como, data de nascimento, e-mail pessoal e número de telefone fixo/móvel pessoal são informações pessoais." + (obs?"\n\n":"") + obs;
+					if (acesso == 1) obs = "Com base na LGPD, documento de identificação de pessoa física com informação biométrica, endereço de pessoa física, números de CPF ou RG, assim como, data de nascimento, e-mail pessoal e número de telefone fixo/móvel pessoal são informações pessoais." + (obs?"\n\n":"") + obs;
 					$(doc).find("#txaObservacoes").val(obs);
 				} else return false;
 				
@@ -625,14 +633,23 @@ async function alterarDocumento(url_doc_alterar, anchor_doc_alterar, descricao, 
 		
 		let anchor_id = $(anchor_doc_alterar).attr('id').replace(/\D/g, "");
 		
-		if (acesso_publico) {
-			$(anchor_doc_alterar).next('img[src*=espaco]').remove();
-			$(anchor_doc_alterar).nextAll(`#anchorNA${anchor_id}`).remove();
-		} else {
-			let anchor_restrito = `<img src="/infra_css/imagens/espaco.gif">
-			<a id="anchorNA${anchor_id}" href="javascript:alert('Acesso Restrito\nInformação Pessoal (Art. 31 da Lei nº 12.527/2011)');">
-			  <img src="imagens/sei_chave_restrito.gif" id="iconNA${anchor_id}" title="Acesso Restrito Informação Pessoal (Art. 31 da Lei nº 12.527/2011)" align="absbottom">
-			</a>`;
+		$(anchor_doc_alterar).next('img[src*=espaco]').remove();
+		$(anchor_doc_alterar).nextAll(`#anchorNA${anchor_id}`).remove();
+		if (!acesso_publico) {
+			let anchor_restrito;
+			
+			if (acesso == 1) {
+				anchor_restrito = `<img src="/infra_css/imagens/espaco.gif">
+				<a id="anchorNA${anchor_id}" href="javascript:alert('Acesso Restrito\nInformação Pessoal (Art. 31 da Lei nº 12.527/2011)');">
+				  <img src="imagens/sei_chave_restrito.gif" id="iconNA${anchor_id}" title="Acesso Restrito Informação Pessoal (Art. 31 da Lei nº 12.527/2011)" align="absbottom">
+				</a>`;
+			} else {
+				anchor_restrito = `<img src="/infra_css/imagens/espaco.gif">
+				<a id="anchorNA${anchor_id}" href="javascript:alert('Acesso Restrito\nInformações Econômico-Financeiras de Empresa (Art. 39, parágrafo único, da Lei nº 9.472/1997)');">
+				  <img src="imagens/sei_chave_restrito.gif" id="iconNA${anchor_id}" title="Informações Econômico-Financeiras de Empresa (Art. 39, parágrafo único, da Lei nº 9.472/1997)" align="absbottom">
+				</a>`;
+			}
+			
 			$(anchor_doc_alterar).after(anchor_restrito);
 		}
 		
@@ -992,7 +1009,7 @@ function getCurrentUser() {
 
 //Retornar dados do usuário corrente {login,nome}
 function getCurrentLotacao() {
-	if (sel = top.window.document.getElementById('selInfraUnidades')) return $(sel).text().trim();
+	if (sel = top.window.document.getElementById('selInfraUnidades')) return $(sel).find('option:selected').text().trim();
 	return null;
 }
 
@@ -1335,6 +1352,26 @@ function applyActionPanel(items) {
 											   
 											   browser.runtime.sendMessage({action: "open", url: urls});
 										   }},
+										   
+								{action: "consultar-user-sei", 
+								 icon: "icon-user-sei", 
+								 title: "Consultar Usuário Externo", 
+								 condition: function(e) {return !testFieldNames($(e.currentTarget).closest('.proc-field').attr('field-name'), /\bfistel\b/i) && validateFistel($(this).text())}, 
+								 callback: async function(e) {
+									 
+											   let cpf = $(this).text().replace(/\D/g,"");
+											   
+											   waitMessage(`Consultando Usuário Externo SEI para o CPF nº ${cpfjReadable(cpf)}...`);
+										       consultarUsuarioExterno(cpf).then(data => {
+													if (data.status == "ok") infoMessage(`Usuário Externo SEI **VÁLIDO!**\n\n@@**Nome:** ${data.nome}\n**E-mail:** ${data.email}@@\n`);
+													else errorMessage(`Usuário Externo SEI **INVÁLIDO!**\n\n@@**Nome:** ${data.nome}\n**Situação:** ${data.status}@@\n`);
+											   }).catch(error => {
+													errorMessage(error.message);
+											   }).finally(() => {waitMessage()});
+											   
+		
+										   }},
+										   
 
 								{action: "consultar-extrato", 
 								 icon: "icon-search", 

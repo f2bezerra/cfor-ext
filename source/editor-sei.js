@@ -439,6 +439,16 @@ if (editor) {
 			
 			let id = "extrato_" + Math.floor((Math.random() * 100000));
 			let extr = {id: id, fistel: fistel, status: status, filtro: !filtro ? null : filtro.replace(/\bAND\b/g, "&&").replace(/\bOR\b/g, "||").replace(/\bNOT\b/g, "!")};
+			if (status) {
+				status = status.toUpperCase();
+				
+				if (status == "P") status = "$pendente";
+				else status = `$status == ${status}`;
+				
+				if (extr.filtro) extr.filtro = status + " && (" + extr.filtro + ")";
+				else extr.filtro = status;
+			}
+			
 			if (!extratos) extratos = [];
 			extratos.push(extr);
 			return "$" + id;

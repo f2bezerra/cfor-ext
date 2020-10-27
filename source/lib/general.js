@@ -3106,7 +3106,7 @@ function solve(expr, undef, vars = null, unescape = true) {
 	if (!isNaN(expr)) return Number(expr);
 	if (expr.match(/^\s*NULL\s*$/i)) return null;
 	
-	var s, value;
+	var s, s2, value;
 	
 	if (unescape) {
 		expr = expr.replace(/<(\w+)[^>]*?>(.*)<\/\1>/g,"$2").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").trim(); 
@@ -3120,7 +3120,7 @@ function solve(expr, undef, vars = null, unescape = true) {
 	if (vars && (s = expr.match(/^\s*\$([a-z][\w_]*)\s*$/i))) {
 		value = vars[s[1]]; 
 		if (value != undefined) {
-			if (Array.isArray(value)) return value.length ? value : null;
+			if (Array.isArray(value)) return value.length;
 			if (isNaN(value)) return " " + value;
 			return value;
 		}
@@ -3144,7 +3144,11 @@ function solve(expr, undef, vars = null, unescape = true) {
 				expr = " " + expr.slice(s[0].length);	
 			}
 			
-		} else expr = (s[1]?s[1]:"") + " " + solve(s[2], undef, vars, unescape) + " " + expr.slice(s[0].length);
+		} else {
+			let result = solve(s[2], undef, vars, unescape);
+			if (result == undefined) return undefined;
+			expr = (s[1]?s[1]:"") + " " + result + " " + expr.slice(s[0].length);
+		}
 	}
 	
 	if (undef && undef.test(expr)) return undefined;
@@ -3152,7 +3156,10 @@ function solve(expr, undef, vars = null, unescape = true) {
 	expr = expr.replace(/\t+/g," ").trim();
 	
 	if (vars && (s = expr.match(/^\s*\$([a-z][\w_]*)\s*=\s*([^=].*?)\s*$/i))) {
-		value = solve(s[2], undef, vars, unescape);
+	
+		if (s2 = s[2].match(/^\s*\$([a-z][\w_]*)\s*$/i)) value = vars[s2[1]]; 
+		else value = solve(s[2], undef, vars, unescape);
+		
 		if (value === undefined) return undefined;
 		vars[s[1]] = value;
 		if (Array.isArray(value)) return value.length;

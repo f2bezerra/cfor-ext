@@ -232,7 +232,10 @@ document.getElementById("ifrVisualizacao").addEventListener("load", function() {
 		
 	
 		$optRestrito.on("change", function (e) {
-			if (!predata.hipotese) predata.hipotese = 34; //Informação pessoal
+			if (!predata.hipotese) {
+				if (predata.acesso == 2) predata.hipotese = 38; //Informação econômica
+				else predata.hipotese = 34; //Informação pessoal
+			}
 			
 			var last_len = 0, hs = setInterval(function() {
 				if (!selHipo.length) return;

@@ -137,12 +137,22 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 		
 		var refresh_all_panels = (fields, servico, descricao) => {
 			let proc = getCurrentProcesso();
+			let append_fields_only = (servico === true && fields);
+			
+			if (append_fields_only) {
+				if (!Array.isArray(fields)) fields = [fields];
+				servico = undefined;
+				descricao = undefined;
+			}
 			
 			var script = `
 				if ((panel = $('#panelDetails').get(0)) && getCurrentProcesso() == "${proc}") {
-					$(panel).find('.proc-field').remove();
+					
 					let last_p = $(panel).find('p:contains("Interessado:"):last').get(0) || $(panel).find('p:contains("Interessados:"):last').get(0) || $(panel).find('p:last').get(0);
+					let p;
 			`;
+			
+			if (!append_fields_only) script += "$(panel).find('.proc-field').remove();\n";
 			
 			if (servico != undefined) {
 				script += `
@@ -162,10 +172,16 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 			
 			if (fields) {
 				fields.forEach(f => {
-					script += `$(last_p).before($('<p class="proc-field" field-name="${identityNormalize(f.name)}"><label>${f.name}: </label><span class="actionable">${f.value}</span></p>'));` + "\n";
+					script += `
+					p = $('<p class="proc-field" field-name="${identityNormalize(f.name)}"><label>${f.name}: </label><span class="actionable">${f.value}</span></p>');
+					$(last_p).before(p);
+					`;
+					
+					if (append_fields_only) script += `applyActionPanel($(p).find('.actionable'));`;
+					
 				});
 				
-				script += `
+				if (!append_fields_only) script += `
 				applyActionPanel('.proc-field span');
 				$(panel).get(0).removeCommand("icon-refresh");
 				`;
@@ -332,11 +348,12 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 								values += `${data.name}:${data.value};`;
 								$(doc).find("#txaObservacoes").val(values);
 							}).then(() => {
-								let $f = $(`<p class="proc-field" field-name="${identityNormalize(data.name)}"><label>${data.name}: </label><span class='actionable'>${data.value}</span></p>`);
+/* 								let $f = $(`<p class="proc-field" field-name="${identityNormalize(data.name)}"><label>${data.name}: </label><span class='actionable'>${data.value}</span></p>`);
 								let last_p = $(divDt).find('p:contains("Interessado:"):last').get(0) || $(divDt).find('p:contains("Interessados:"):last').get(0) || $(divDt).find('p:last').get(0);
 								$(last_p).before($f);
-								applyActionPanel($f.find('.actionable'));
-								notify("success", "Campo atualizado");
+								applyActionPanel($f.find('.actionable')); */
+								refresh_all_panels(data, true);
+ 								notify("success", "Campo atualizado");
 							}).catch(e => notify("fail", "Inclusão de campo falhou\n" + e.message));
 						 });
 		});

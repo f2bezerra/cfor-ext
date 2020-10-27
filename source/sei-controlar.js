@@ -1,7 +1,7 @@
 ﻿$(function() {
-	
+	//Controle de Lotação
 	var lotacao = getCurrentLotacao();
-	if (lotacao && lotacao != "GR05OR") {
+	if (lotacao && !("GR05OR|GR05AF".includes(lotacao))) {
 		if (!document.baseURI.match(/controlador\.php\?acao=infra_configurar&.*/i)) {
 			if (anchor = top.window.document.getElementById('lnkConfiguracaoSistema')) {
 				browser.runtime.sendMessage({action: "navigate", url: absoluteUrl($(anchor).attr("href")), script: undefined});			
@@ -10,11 +10,13 @@
 		} else {
 			$('#divInfraAreaTelaD').html(`
 				<h1 class="infraBarraLocalizacao"><img src="${browser.runtime.getURL('assets/logo-24.png')}"> Aviso Importante!</h1>
-				<h2>A extensão "cfor-ext" está habilitada apenas para a lotação <strong style="font-weight: 700;">GR05OR</strong>. <br><br> Altere a lotação ou desinstale a extensão!</h2>
+				<h2>A extensão "cfor-ext" está habilitada apenas para as lotações <strong style="font-weight: 700;">GR05OR e GR05AF</strong>. <br><br> Altere sua lotação "${lotacao}" ou desinstale a extensão!</h2>
 			`);
 		}
 	}
 	
+	
+	//Controle de Versão
 	const CURRENT_NEWS = 3;
 
 	if (!localStorage.cfor_lastnews || localStorage.cfor_lastnews < CURRENT_NEWS) {
@@ -33,20 +35,6 @@
 
 	 
 	//Atalhos
-	/* if ((btnSalvar = $(':submit[value=Salvar]').get(0) || $(':button[value="Confirmar Dados"]').get(0) || $(':button[value="Salvar"]').get(0))) {
-		let keyDownHandler = function (e) {
-			if (e.ctrlKey && e.key == "Enter") {
-				e.preventDefault();
-				e.stopPropagation();
-				for (var i = 0; i < top.window.parent.frames.length; i++) $(top.window.parent.frames[i].document).off('keydown', keyDownHandler);
-				$(btnSalvar).trigger("click");
-			}
-		};
-
-		for (var i = 0; i < top.window.parent.frames.length; i++) $(top.window.parent.frames[i].document).on('keydown', keyDownHandler);
-	} */
-
-	 
 	 let keyDownHandler = function (e) {
 		if (e.ctrlKey && e.key == "Enter" && (btnSalvar = $(':submit[value=Salvar]').get(0) || $(':button[value="Confirmar Dados"]').get(0) || $(':button[value="Salvar"]').get(0))) {
 			e.preventDefault();
@@ -69,7 +57,8 @@
 	for (var i = 0; i < top.window.parent.frames.length; i++) top.window.parent.frames[i].document.addEventListener('keydown', keyDownHandler, true);
 	top.window.addEventListener('keydown', keyDownHandler, true);
 
-	
+
+	//Criar opção no Menu Principal do SEI	
 /* 	if (main_menu = top.window.document.getElementById("main-menu"))  {
 		
 		if (!$(main_menu).find('#link-cpag').get(0)) {
