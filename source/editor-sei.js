@@ -529,9 +529,15 @@ if (editor) {
 				
 				let table_type = $(table).attr("dynamic-table").toLowerCase();
 				let table_id = $(table).attr("dynamic-table-id");
-				let table_data = solve($(table).attr("dynamic-table-data"), null, uservars);
+				let table_data = $(table).attr("dynamic-table-data");
 
 				$(table).removeAttr("dynamic-table dynamic-table-id dynamic-table-data");
+
+				try {
+					table_data = uservars[identityNormalize(table_data.trim().slice(1))];	
+				} catch (err) {
+					table_data = undefined;
+				}
 				
 				if (!table_data) {
 					write_row_message(table, "Nenhum dado para preenchimento da tabela");

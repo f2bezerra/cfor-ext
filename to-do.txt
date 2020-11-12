@@ -1,0 +1,7 @@
+- Criar formato $fistel@*
+- Criar consulta automática de fistel (fistel = ?)
+- Criar configurações da extensão
+- Criar janela novidades e nova versão
+- Criar ajuda da extensão
+- Campos dinâmicos em formDlg e no interpretador de textos padrão
+- Atalho para alteração do cadastro da entidade

@@ -349,6 +349,28 @@ async function consultarUrlServico(servico, cpfj_indicativo) {
 }
 
 
+// Consultar histórico do serviço
+async function consultarHistoricoServico(servico, id) {
+	let url, method = "get";
+	
+	if (!servico) return Promise.reject("Serviço não identificado");
+	servico = Number(servico);
+	
+	var cpfj = id && id.match(/\s*\d[\d.-]+\s*/) ? id.replace(/\D/g, "") : null;
+	var indicativo = id && id.match(/\s*[a-z][\w-]\s*/i) ? id.replace(/\W/g, "") : null;
+	
+	if (cpfj && !validateCpfj(cpfj)) return Promise.reject("CPF/CNPJ inválido");
+	if (indicativo && (indicativo.length < 4 || indicativo.length > 8)) return Promise.reject(`Indicativo '${indicativo}' inválido`);
+	
+	switch (servico) {
+		case 302: return {url: "http://sistemasnet/scra/Chamada/Historico.asp", postData: {acao: "p", pNumCnpjCpf: cpfj, pIndicativo: indicativo, pindTipoComparacao: "e"}};
+		default: return Promise.reject(`Consulta de histórico de serviço(${servico}) indisponível`);
+	}
+	
+}
+
+
+
 /***** SCPX *****/
 
 //Incluir serviço no SCPX e licenciar estação

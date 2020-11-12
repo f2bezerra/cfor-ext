@@ -117,7 +117,7 @@ function addNovo() {
 				case "licenca": 
 					url = $html.find("[data-desc='oficio'] .ancoraOpcao").attr("href");
 					predata.txtpad = "O-Licença";
-					predata.acesso = 2;
+					predata.acesso = "auto";
 					if (reference && reference.tipo == "licenca") predata.reference = reference;
 					predata.autoconfirm = true;
 					break;
@@ -289,7 +289,7 @@ function addNovo() {
 			
 			if (url && (ifr = window.top.document.getElementById("ifrVisualizacao"))) {
 				if (e.originalEvent.ctrlKey) {
-					chrome.runtime.sendMessage({action: "duplicate", url: url, predata: predata});
+					browser.runtime.sendMessage({action: "duplicate", url: url, predata: predata});
 				} else {
 					sessionStorage.predata = JSON.stringify(predata);
 					if (predata.autoconfirm) ifr.style.visibility = "hidden";
@@ -528,10 +528,10 @@ function addBlocoAssinatura() {
 			
 		}).then(msg => {
 			waitMessage(null);
-			chrome.runtime.sendMessage({action: "notify-success", content: msg});
+			browser.runtime.sendMessage({action: "notify-success", content: msg});
 		}).catch(msg => {
 			waitMessage(null);
-			chrome.runtime.sendMessage({action: "notify-fail", content: msg});
+			browser.runtime.sendMessage({action: "notify-fail", content: msg});
 		}); 
 		
 	});							  
@@ -554,25 +554,23 @@ function addFuncoesAnatel() {
 	
 	switch (servico) {
 		case 302:
-			// items.push("-", {text: "Radioamador", items: [{id: "ra_cons", text: "Consultar Serviço", icon: "extension://assets/consulta.svg"}, "-",
-														  // {id: "ra_pi", text: "Incluir Serviço e Estação", icon: "extension://assets/pxra.svg"}]});
 			items.push({id: "ra_cons", text: "Consultar Serviço", icon: "extension://assets/consulta.svg"});
+			items.push({id: "his_cons", text: "Consultar Histórico", icon: "menu-history-icon"});
 			items.push("-", {id: "ra_pi", text: "Incluir Serviço e Estação", icon: "extension://assets/pxra.svg"});
 			break;
 		case 400:
-			// items.push("-", {text: "PX", items: [{id: "px_cons", text: "Consultar Serviço", icon: "extension://assets/consulta.svg"}, "-",
-												 // {id: "px_pi", text: "Incluir Serviço e Estação", icon: "extension://assets/pxra.svg"}]});
 			items.push({id: "px_cons", text: "Consultar Serviço", icon: "extension://assets/consulta.svg"});
+			// items.push({id: "his_cons", text: "Consultar Histórico", icon: "menu-history-icon"});
 			break;
 
 		case 507:
-			// items.push("-", {text: "Móvel Aeronáutico", items: [{id: "ma_cons", text: "Consultar Serviço", icon: "extension://assets/consulta.svg"}]});
 			items.push({id: "ma_cons", text: "Consultar Serviço", icon: "extension://assets/consulta.svg"});
+			// items.push({id: "his_cons", text: "Consultar Histórico", icon: "menu-history-icon"});
 			break;
 			
 		case 604:
-			// items.push("-", {text: "Móvel Marítimo", items: [{id: "mm_cons", text: "Consultar Serviço", icon: "extension://assets/consulta.svg"}]});
 			items.push({id: "mm_cons", text: "Consultar Serviço", icon: "extension://assets/consulta.svg"});
+			// items.push({id: "his_cons", text: "Consultar Histórico", icon: "menu-history-icon"});
 			break;
 	}
 	
@@ -618,7 +616,7 @@ function addFuncoesAnatel() {
 					}
 					
 					waitMessage("Consultando PX...");
-					consultarUrlServico(400, info.cpf).then(url => chrome.runtime.sendMessage({action: "open", url: [url]})).finally(() => waitMessage(null)).catch(error => errorMessage(error, "PX"));
+					consultarUrlServico(400, info.cpf).then(url => browser.runtime.sendMessage({action: "open", url: [url]})).finally(() => waitMessage(null)).catch(error => errorMessage(error, "PX"));
 			}
 			break;
 			
@@ -650,7 +648,7 @@ function addFuncoesAnatel() {
 					}
 					
 					waitMessage("Consultando RA...");
-					consultarUrlServico(302, info.cpf).then(url => chrome.runtime.sendMessage({action: "open", url: [url]})).finally(() => waitMessage(null)).catch(error => errorMessage(error, "RA"));
+					consultarUrlServico(302, info.cpf).then(url => browser.runtime.sendMessage({action: "open", url: [url]})).finally(() => waitMessage(null)).catch(error => errorMessage(error, "RA"));
 			}
 			break;
 
@@ -661,7 +659,7 @@ function addFuncoesAnatel() {
 					}
 					
 					waitMessage("Consultando Móvel Aeronáutico...");
-					consultarUrlServico(507, info.cpfj).then(url => chrome.runtime.sendMessage({action: "open", url: [url]})).finally(() => waitMessage(null)).catch(error => errorMessage(error, "Móvel Aeronáutico"));
+					consultarUrlServico(507, info.cpfj).then(url => browser.runtime.sendMessage({action: "open", url: [url]})).finally(() => waitMessage(null)).catch(error => errorMessage(error, "Móvel Aeronáutico"));
 			}
 			break;
 
@@ -672,9 +670,24 @@ function addFuncoesAnatel() {
 					}
 					
 					waitMessage("Consultando Móvel Marítimo...");
-					consultarUrlServico(604, info.cpfj).then(url => chrome.runtime.sendMessage({action: "open", url: [url]})).finally(() => waitMessage(null)).catch(error => errorMessage(error, "Móvel Marítimo"));
+					consultarUrlServico(604, info.cpfj).then(url => browser.runtime.sendMessage({action: "open", url: [url]})).finally(() => waitMessage(null)).catch(error => errorMessage(error, "Móvel Marítimo"));
 			}
 			break;
+			
+			case "his_cons": {
+				
+					if (!info.cpfj) {
+						errorMessage("CPF/CNPJ do interessado não informado.\n\nInforme no próprio cadastro do interessado **ou** inclua um campo CPF ou CNPJ no processo.", "Histórico");
+						return;
+					}
+					
+					waitMessage("Consultando Histórico do " + getDescServico(servico) + "...");
+					consultarHistoricoServico(servico, info.cpfj).then(data => {
+						browser.runtime.sendMessage({action: "open", url: data.url, postData: data.postData});
+					}).finally(() => waitMessage(null)).catch(error => errorMessage(error, "Histórico"));
+			}
+			break;
+			
 			
 		}
 		

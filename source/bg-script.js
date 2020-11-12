@@ -36,15 +36,30 @@ function handleMessage(message, sender) {
 			
 			
 		case "open": {
-			if (Array.isArray(message.url)) {
-				
-				browser.tabs.query({active: true, currentWindow: true}).then(tab => {
-					let i = message.url.length;
-					while (i--) browser.tabs.create({url: message.url[i], index: tab[0].index+1});
+			if (message.url) {
+				if (Array.isArray(message.url)) {
+					
+					browser.tabs.query({active: true, currentWindow: true}).then(tab => {
+						let i = message.url.length;
+						while (i--) browser.tabs.create({url: message.url[i], index: tab[0].index+1});
+					});
+				} else browser.tabs.create({url: message.url}).then(tab => {
+					if (message.postData) {
+						let code = "var i;";
+						for (let param in message.postData) {
+							if (message.postData.hasOwnProperty(param)) {
+								code += `i = document.getElementById('${param}') || document.getElementsByName('${param}')[0];if (i) i.value = "${message.postData[param] ? message.postData[param] : ''}";`; + "\n";
+								
+							}
+						}
+						code += "var f = document.querySelector('form'); if (f) f.submit();";
+						browser.tabs.executeScript(tab.id, {code: code, runAt: "document_idle"});
+					} else {
+						if (message.script) browser.tabs.executeScript(tab.id, {code: message.script, runAt: message.runAt ? message.runAt : "document_idle"});
+						if (message.css) browser.tabs.insertCSS(tab.id, {code: message.css, runAt: message.runAt ? message.runAt : "document_idle"});
+					}
 				});
-			} else browser.tabs.create({url: message.url}).then(tab => {
-				if (message.script) browser.tabs.executeScript(tab.id, {code: message.script, runAt: message.runAt ? message.runAt : "document_idle"});
-			});
+			};
 			
 			break;
 		}

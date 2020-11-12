@@ -274,42 +274,12 @@ document.getElementById("ifrVisualizacao").addEventListener("load", function() {
 		
 		//LABORATORIO DE TESTES
  		// addCommand("btnLab", "lab.svg", "Teste de Novidades", null, async e => {
-			// // let info = getCurrentProcInfo();
-			
-			// // if (!info.cpfj) {
-				// // errorMessage("CPF/CNPJ do interessado não informado.\n\nInforme no próprio cadastro do interessado **ou** inclua um campo CPF no processo.", "RA");
-				// // return;
-			// // }
-			
-			// // waitMessage("Consultando...");
-			
-			// // // consultarUrlServico(604, info.cpfj).then(url => chrome.runtime.sendMessage({action: "open", url: [url]})).finally(() => waitMessage(null)).catch(error => errorMessage(error, "Móvel Aeronáutico"));
-			// // // consultarUsuarioExterno(info.nome);
-			
-			// // if (!info.cpf) return errorMessage("CPF do interessado não informado.", "PX");
-			
-			// // consultarEntidade(info.cpf).then(cadastro => {
-				// // waitMessage(null);
-				// // let msg = `@@**Entidade:** ${cadastro.nome.toUpperCase()}\n`;
-				
-				// // if (info.cpf) msg += `**CPF:** ${cpfjReadable(cpfj)}\n**Identidade:** ${cadastro.rg}/${cadastro.expedidor}\n**Data de Nascimento:** ${cadastro.nascimento}\n`;
-				// // else msg += `**CNPJ:** ${cpfjReadable(cpfj)}\n`;
-				
-				// // msg += `**E-Mail:** ${cadastro.email?cadastro.email:""}\n**Endereço${info.cnpj?" Sede":""}:** ${cadastro.logradouro}${cadastro.num?", " + cadastro.num:""}${cadastro.complemento?", "+cadastro.complemento:""}${cadastro.bairro?", "+cadastro.bairro:""}\n` +
-					   // // `**Município:** ${cadastro.municipio}/${cadastro.uf}\n**CEP:** ${cadastro.cep}@@`;
-				// // popupMessage(msg, "Consulta");
-				
-			// // }).catch(error => {
-				// // waitMessage(null);
-				// // errorMessage(error, "Consulta")
-			// // });			
+			// let info = getCurrentProcInfo();
 			
 			
-			// // autorizarPX(info.cpf, info.processo).then(data => {
-				// // waitMessage("Atualizando campos...");
-				// // storeFields([{name: "Fistel", value: data.fistel}, {name: "Indicativo", value: data.indicativo}], true).then(html => console.log('ok')).catch(err => console.log(err)).finally(() => waitMessage(null));
-			// // });
-			// // captureNextProcesso(e);
+			 // waitMessage("Consultando...");
+			
+			 // consultarHistoricoServico(302, info.cpfj).then(data => browser.runtime.sendMessage({action: "open", url: data.url, postData: data.postData})).finally(() => waitMessage(null)).catch(error => errorMessage(error, "Teste"));
 		// });
  		
 		
