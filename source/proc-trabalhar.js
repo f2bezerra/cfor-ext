@@ -274,12 +274,9 @@ document.getElementById("ifrVisualizacao").addEventListener("load", function() {
 		
 		//LABORATORIO DE TESTES
  		// addCommand("btnLab", "lab.svg", "Teste de Novidades", null, async e => {
-			// let info = getCurrentProcInfo();
 			
+			// getDocumentoInfo({first: "*", until: "recibo"}).then(data => console.log(data));
 			
-			 // waitMessage("Consultando...");
-			
-			 // consultarHistoricoServico(302, info.cpfj).then(data => browser.runtime.sendMessage({action: "open", url: data.url, postData: data.postData})).finally(() => waitMessage(null)).catch(error => errorMessage(error, "Teste"));
 		// });
  		
 		

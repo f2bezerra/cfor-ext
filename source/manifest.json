@@ -1,7 +1,7 @@
 {
 	"manifest_version": 2,
 	"name": "cfor-ext",
-	"version": "3.1.7",
+	"version": "3.1.10",
 	"author": "Fabio Fernandes Bezerra",
 	"description": "Extensão de funcionalidades do SEI",
 	
@@ -29,7 +29,7 @@
 						 "js": ["proc-atrib-listar.js"]},
 						 
 						{"matches": ["*://*.br/sei/controlador.php?acao=editor_montar*"],
-						 "js": ["lib/anatel.js", "editor-sei.js"]},
+						 "js": ["lib/anatel.js", "txtpadrao-parser.js"]},
 						 
 						{"matches": ["*://*.br/sei/controlador.php?acao=procedimento_enviar_email*", "*://*.br/sei/controlador.php?acao=documento_enviar_email*"],
 						 "all_frames": true,
@@ -37,7 +37,7 @@
 						 
 						{"matches": ["*://*.br/sei/controlador.php?acao=texto_padrao_interno_alterar*", "*://*.br/sei/controlador.php?acao=texto_padrao_interno_cadastrar*"],
 						 "all_frames": true,
-						 "js": ["lib/keditor.js", "lib/intellisense.js", "txtpadrao-editar.js"]},
+						 "js": ["lib/keditor.js", "lib/intellisense.js", "txtpadrao-editor.js"]},
 						 
 						{"matches": ["*://*.br/sei/controlador.php?acao=texto_padrao_interno_consultar*"],
 						 "all_frames": true,
@@ -83,7 +83,11 @@
 						 "js": ["lib/jquery.min.js", "externo/consulta-proteger.js"]},
 
 						{"matches": ["*://sistemasnet/*/Historico.asp*"],
-						 "css": ["externo/historico.css"]}
+						 "css": ["externo/historico.css"]},
+
+						{"matches": ["*://*.br/sei/controlador.php?acao=md_utl_analise_cadastrar*"],
+						 "all_frames": true,
+						 "js": ["pgd/pgd-analise-cadastrar.js"]}
 						 
 						 ],
 						 

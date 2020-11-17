@@ -297,6 +297,7 @@ function getFrameDocument(frame) {
 			case "ifrArvore":
 			case "arvore":
 				frame =  window.top.document.getElementById("ifrArvore");
+				if (!frame && document.getElementById("frmArvore")) return document; 
 				break;
 				
 			case "ifrVisualizacao":
@@ -308,11 +309,16 @@ function getFrameDocument(frame) {
 			case "ifrArvoreHtml":
 			case "documento":
 				frame =  window.top.document.getElementById("ifrVisualizacao");
-				if (!frame) return null;
+				if (!frame) {
+					if (document.getElementById("divArvoreHtml")) return document; 
+					return null;
+				} 
+				
 				frame = (frame.contentDocument || frame.contentWindow.document).getElementById("ifrArvoreHtml");
 				break;
 		}
 	}
+	
 	
 	if (!(frame instanceof Element) || frame.tagName != "IFRAME") return null;
 	
@@ -1046,6 +1052,150 @@ function getCurrentProcInfo() {
 	
 	return result;
 }
+
+//Informações de documento na árvore SEI
+//Opções de filtro: <num_sei> | <identificação_do_documento> | {first,last,until,all,length,offset}
+async function getDocumentoInfo(filter, cache) {
+	var doc = getFrameDocument("arvore");
+	if (!doc) return Promise.reject("Documento da árvore não encontrada");
+	
+	var tree = cache && cache.tree && Array.isArray(cache.tree) && cache.tree.length ? cache.tree : [];
+	var node;
+	
+	if (!tree.length) {
+		var pastas = $(doc).find('#divArvore [id^="anchorPASTA"]').get();
+		var pinfo;
+		
+		var add_node_fn = (text, href, active) => {
+			if (m = text.match(/^\s*(\d{5}\.\d{6}\/\d{4}\-\d{2})\s*$|^\s*(([^\s]+)[^\d]*(\b\d+\b)?.*)\s+\(?(\d+)\)?\s*$/)) 
+				tree.push(m[1] ? {id: m[1], tipo: "processo", sei: m[1].replace(/\D/g,""), href: href, ativo: active == true} : {id: m[2], desc: m[3], tipo: filterAccents(m[3], String.prototype.toLowerCase), num: m[4], sei: m[5], href: href, ativo: active == true});
+		};
+		
+		while (pastas.length) {
+			//let pn = Number(pastas.pop().id.slice(11));
+			let pn = Number(pastas.shift().id.slice(11));
+			
+			if ($(doc).find(`#divArvore #anchorAGUARDE${pn}`).length) {
+				if (!pinfo) {
+					if (script = $(doc).find('script:contains("inicializar()")').text()) {
+						pinfo = [];
+						let m, regex = /Pastas\[(\d+)\]\s*[['".]{1,2}(\w+)[\]'".]{1,2}\s*=\s*['"](.+)['"]/gm;
+
+						while (m = regex.exec(script)) {
+							if (m.index === regex.lastIndex) regex.lastIndex++;
+							m[1] = Number(m[1]);
+							if (!pinfo[m[1]]) pinfo[m[1]] = [];
+							pinfo[m[1]][m[2]] = m[3];
+						}																						
+					}
+				}
+				
+				if (!pinfo[pn] || !pinfo[pn].link || !pinfo[pn].protocolos) return Promise.reject("Informação de pasta não encontrada");
+				
+				let data = 	await getAjaxContent(absoluteUrl(pinfo[pn].link),{method: "post", params: {hdnArvore: encodeURIComponent($(doc).find('#hdnArvore').val()),
+																									   hdnPastaAtual: `PASTA${pn}`,
+																									   hdnProtocolos: encodeURIComponent(pinfo[pn].protocolos)}});
+																			 
+					
+				if (!data) return Promise.reject("Falha na consulat de pastas");
+				
+				let regex_node = /Nos\[\d+\].*?=\s*?new\s*?infraArvoreNo\s*?\("([^"]+)"\s*,\s*"(\d+)".*?"(controlador.php[^"]*?)".*?ifrVisualizacao\s*"\s*,\s*"([^"]*?)"/ig;
+				
+				while (node = regex_node.exec(data)) {
+					if (node.index === regex_node.lastIndex) regex_node.lastIndex++;
+					add_node_fn(node[4], node[3]);
+				}						
+			}
+		}
+
+		$(doc).find('#divArvore a[id^=anchor][target=ifrVisualizacao]').each((index, item)=> {add_node_fn(item.innerText, item.getAttribute("href"), $(item).find('.infraArvoreNoSelecionado').length > 0)});
+		
+		if (cache != undefined) cache.tree = tree;
+	}
+	
+	if (!tree.length) return null;
+	if (filter) {
+		
+		let filter_callback = (f) => {
+			if (typeof f == "number") f = f.toString();
+			if (f === true || f == "current" || f == "active") return (n) => n.active; 
+			if (typeof f == "string") {
+				f = f.trim();
+				if (f.match(/^\d{7}$/)) return (n) => n.sei == f;
+				f = filterAccents(f.replace(/\s{2,}/g, " "));
+				let regex_filter = new RegExp(f, "i");
+				return (n) => regex_filter.test(filterAccents(n.id.replace(/\s{2,}/g, " ")));
+			} 
+			
+			if (filter instanceof RegExp) return (n) => {filter.test(filterAccents(n.id))};
+			
+			return null;
+		};
+		
+		if (typeof filter == "string") {
+			switch (filter.trim().toLowerCase()) {
+				case "first": return tree[0];
+				case "last": return tree[tree.length-1];
+			}
+		}
+		
+		if (fn = filter_callback(filter)) tree = tree.filter(fn);
+		else if (typeof filter == "object") {
+			let result = [];
+			
+			if (filter.first) {
+				if (filter.first == "any" || filter.first == "*") {
+					filter.first = true;
+					filter.all = true;
+				} else if (filter.first !== true) filter.first = filter_callback(filter.first);
+			} 
+			if (filter.last) {
+				if (filter.last == "any" || filter.last == "*") {
+					filter.last = true;
+					filter.all = true;
+				} else if (filter.last !== true) filter.last = filter_callback(filter.last);
+			} 
+			if (filter.until) filter.until = filter_callback(filter.until);
+			if (filter.length) filter.all = true;
+			
+			if (filter.first) {
+				
+				for (let node of tree) {
+					if (filter.until && filter.until(node)) break;
+					if (filter.first === true || filter.first(node)) {
+						if (filter.offset) {
+							filter.offset--;
+							continue;
+						}
+						if (!filter.all) return node;
+						result.push(node);
+						if (filter.length && result.length == filter.length) break;
+					}
+				}
+			} else if (filter.last) {
+				for (i = tree.length-1; i >= 0; i--) {
+					if (filter.until && filter.until(tree[i])) break;
+					if (filter.last === true || filter.last(tree[i])) {
+						if (filter.offset) {
+							filter.offset--;
+							continue;
+						}
+						if (!filter.all) return tree[i];
+						result.unshift(tree[i]);
+						if (filter.length && result.length == filter.length) break;
+					}
+				}
+			}
+			
+			tree = result;
+		}
+	}
+	
+	
+	return tree.length == 1 ? tree[0] : tree.length > 1 ? tree : null;
+}
+
+
 
 
 //Escrever ponto de controle para processo ativo

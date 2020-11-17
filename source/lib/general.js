@@ -617,6 +617,40 @@ function setClipboard(text, options) {
 
 
 
+/*** Codifica parâmetros de requisição HTML ***
+
+		data: endereço da requisição :: <string> | <object>
+		charset: conjunto de caracteres
+		
+		return <string>
+*/
+function encodeXHRParams(data, charset) {
+	if (!data) return undefined;
+	if (typeof data == "string") {
+		if (charset == "iso-8859-1") return escape(data).replace(/%20/g, "+");
+		else return decodeURIComponent(data).replace(/%20/g, "+");
+	}
+
+	let params = "";
+	
+	for (let prop in data) {
+		if (data.hasOwnProperty(prop)) {
+			if (data[prop] === false) continue;
+			params += (params?"&":"") + prop + "=";
+			if (data[prop]) {
+				if (typeof data[prop] == "string") data[prop] = data[prop].trim();
+
+				if (charset == "iso-8859-1") params += escape(data[prop]).replace(/%20/g, "+");
+				else params += decodeURIComponent(data[prop]).replace(/%20/g, "+");
+			}
+		}
+	}
+	
+	return params;
+}
+
+
+
 /*** Fazer requisição SÍNCRONA ***
 
 		url: endereço da requisição :: <string>
@@ -686,16 +720,16 @@ function syncAjaxRequest(url, method, data, options) {
 		
 		return Promise
 */
-function getAjaxContent(url, options) {
+async function getAjaxContent(url, options) {
 	if (!options) options = {};
 	
-	let default_options = {charset: "iso-8859-1"};	// iso-8859-1 | utf-8
+	let default_options = {method: "GET",
+						   params: undefined,	
+						   charset: "iso-8859-1"};	// iso-8859-1 | utf-8
 						   
 	for (let prop in default_options) if (default_options.hasOwnProperty(prop) && default_options[prop] != undefined && options[prop] == undefined) options[prop] = default_options[prop];
 	
-	if (typeof options.returnError == "function") options.returnError = (options.returnError.constructor.name != "AsyncFunction");
-	
-	let ajax_setting = {url: absoluteUrl(url.replace(/&amp;/g, "&")), method: "GET", crossDomain: true};
+	let ajax_setting = {url: absoluteUrl(url.replace(/&amp;/g, "&")), method: options.method.toUpperCase(), crossDomain: true, data: encodeXHRParams(options.params)};
 			
 	if (options.charset == "iso-8859-1") {
 		ajax_setting.contentType = `application/x-www-form-urlencoded;charset=${options.charset}`;
@@ -2308,6 +2342,8 @@ function openFormDlg(fields, title, options, validation) {
 				
 			case "date":
 				f.elem = $(`<input type="date" class="form-control" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">`).get(0);
+				f.value = f.value && (typeof f.value == "string" || f.value instanceof Date) ? f.value.toDateDB() : "";
+				
 				if (f.min != undefined) {
 					if (typeof f.min == "string") f.min = (md = f.min.match(/^\s*(\d{1,2})\/(\d{2})\/(\d{4})\s*$/)) ? `${md[3]}-${md[2]}-${md[1]}` : null;
 					if (f.min instanceof Date) f.min = `${f.min.getFullYear()}-${f.min.getMonth()}-${f.min.getDate()}`;

@@ -363,6 +363,9 @@ async function consultarHistoricoServico(servico, id) {
 	if (indicativo && (indicativo.length < 4 || indicativo.length > 8)) return Promise.reject(`Indicativo '${indicativo}' inválido`);
 	
 	switch (servico) {
+		case 19: return {url: "http://sistemasnet/stel/chamada/Historico.asp?SISQSmodulo=10253", postData: {acao: "p", pNumCnpjCpf: cpfj, pIndicativo: indicativo, pindTipoComparacao: "e"}};
+		case 604: return {url: "http://sistemasnet/stel/SCMM/Chamada/Historico.asp?SISQSmodulo=20876", postData: {acao: "p", pNumCnpjCpf: cpfj, pIndicativo: indicativo, pindTipoComparacao: "e"}};
+		case 507: return {url: "http://sistemasnet/stel/SCMA/Chamada/Historico.asp?SISQSmodulo=20835", postData: {acao: "p", pNumCnpjCpf: cpfj, pIndicativo: indicativo, pindTipoComparacao: "e"}};
 		case 302: return {url: "http://sistemasnet/scra/Chamada/Historico.asp", postData: {acao: "p", pNumCnpjCpf: cpfj, pIndicativo: indicativo, pindTipoComparacao: "e"}};
 		default: return Promise.reject(`Consulta de histórico de serviço(${servico}) indisponível`);
 	}
