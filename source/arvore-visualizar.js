@@ -19,9 +19,10 @@
 		
 		
 		if ($('#divArvoreAcoes a[onclick*="reabrirProcesso()"]').length) {
+			addFuncoesAnatel(false);
 			addNextProc();
 		} else {
-			addFuncoesAnatel();
+			addFuncoesAnatel(true);
 		}
 		
 		if (anchor_close = $('#divArvoreAcoes a[onclick*="concluirProcesso()"]').get(0)) {
@@ -544,7 +545,13 @@ function addNextProc() {
 }
 
 
-function addFuncoesAnatel() {
+async function verificarCampos(servico, html) {
+	alert(servico, "Carregou");
+	console.log(html);
+}
+
+
+function addFuncoesAnatel(aberto) {
 	let servico = (info = getCurrentProcInfo()) && info.codServico;
 
 	if (!servico) return;
@@ -556,7 +563,7 @@ function addFuncoesAnatel() {
 		case 302:
 			items.push({id: "ra_cons", text: "Consultar Serviço", icon: "extension://assets/consulta.svg"});
 			items.push({id: "his_cons", text: "Consultar Histórico", icon: "menu-history-icon"});
-			items.push("-", {id: "ra_pi", text: "Incluir Serviço e Estação", icon: "extension://assets/pxra.svg"});
+			if (aberto) items.push("-", {id: "ra_pi", text: "Incluir Serviço e Estação", icon: "extension://assets/pxra.svg"});
 			break;
 		case 400:
 			items.push({id: "px_cons", text: "Consultar Serviço", icon: "extension://assets/consulta.svg"});
@@ -573,6 +580,9 @@ function addFuncoesAnatel() {
 			// items.push({id: "his_cons", text: "Consultar Histórico", icon: "menu-history-icon"});
 			break;
 	}
+	
+	items.push("-", {id: "cons_pagto", text: "Consultar Pagamentos", icon: "extension://assets/consulta.svg"});
+	
 	
 	if (items.length == 1 && items[0].items) items = items[0].items;
 	
@@ -609,6 +619,55 @@ function addFuncoesAnatel() {
 			}
 			break;
 			
+			
+			case "cons_pagto": {
+
+				if (!info.fistel) {
+					errorMessage("Fistel não informado.\n\nInclua um campo FISTEL no processo.", "Consulta de Pagamentos");
+					return;
+				}
+				
+				waitMessage(`Consultando ${info.fistel}...`);
+				consultarExtrato(info.fistel).then(data => {
+					waitMessage(null);
+					
+					if (!data.lancamentos) {
+						errorMessage(`Não foram encontrados lançamentos para o FISTEL ${info.fistel} informado`, "Consulta de Pagamentos");
+						return;
+					}
+					
+					let total = 0;
+					let devedores =  data.lancamentos.filter(lancto => lancto.status == "D");
+					let pendentes =  data.lancamentos.filter(lancto => lancto.pendente);
+					let msg, lanctos;
+					
+					if (devedores.length || pendentes.length) {
+						if (devedores.length) {
+							msg = `@@O FISTEL ${info.fistel} possui os seguintes **DÉBITOS**:@@\n`;
+							lanctos = devedores;
+						} else {
+							msg = `@@O FISTEL ${info.fistel} possui os seguintes lançamentos **PENDENTES** de pagamento:@@\n`;
+							lanctos = pendentes;
+						}
+						
+						msg += "|Seq|Receita|Vencimento|Valor|\n";
+						msg += "|:-:|-------|:--------:|----:|\n";
+						let total = 0;
+						for (lancto of lanctos) {
+							msg += `|${lancto.seq}|${lancto.rec}|${lancto.vencto}|${Number(lancto.valor).toMoney()}|` + "\n";
+							total += lancto.valor;
+						}
+						msg += "Total: " + total.toMoney();
+						popupMessage(msg, "Consulta de Pagamentos");
+					} else infoMessage(`O FISTEL ${info.fistel} **NÃO** possui **PENDÊNCIAS**`, "Consulta de Pagamentos");
+					
+				}).catch(error => {
+					waitMessage(null);
+					errorMessage(error, "Consulta de Pagamentos")
+				});			
+			}
+			break;			
+			
 			case "px_cons": {
 					if (!info.cpf) {
 						errorMessage("CPF do interessado não informado.\n\nInforme no próprio cadastro do interessado **ou** inclua um campo CPF no processo.", "PX");
@@ -616,7 +675,7 @@ function addFuncoesAnatel() {
 					}
 					
 					waitMessage("Consultando PX...");
-					consultarUrlServico(400, info.cpf).then(url => browser.runtime.sendMessage({action: "open", url: [url]})).finally(() => waitMessage(null)).catch(error => errorMessage(error, "PX"));
+					consultarUrlServico(400, info.cpf).then(url => browser.runtime.sendMessage({action: "open", url: url})).finally(() => waitMessage(null)).catch(error => errorMessage(error, "PX"));
 			}
 			break;
 			

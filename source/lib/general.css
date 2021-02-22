@@ -276,6 +276,16 @@
     background-image: linear-gradient(90deg, #fff0, #ccc 25%, #ccc 75%, #fff0 100%);
 }
 
+.modal-dlg-content table {
+	margin: auto;
+}
+
+.modal-dlg-content table, .modal-dlg-content td, .modal-dlg-content th {
+    border: 1px solid #607d8b;
+    border-collapse: collapse;
+    padding: 2px;
+}
+
 .modal-dlg-content h1 {
 	font-size: 1.4em;
 }

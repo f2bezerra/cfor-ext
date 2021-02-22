@@ -18,7 +18,8 @@ function soundNotification() {
 	audio.play();
 }
 
-function handleMessage(message, sender) {
+
+function handleMessage(message, sender, response) {
 	
 	switch (message.action) {
 		
@@ -55,10 +56,14 @@ function handleMessage(message, sender) {
 						code += "var f = document.querySelector('form'); if (f) f.submit();";
 						browser.tabs.executeScript(tab.id, {code: code, runAt: "document_idle"});
 					} else {
+
 						if (message.script) browser.tabs.executeScript(tab.id, {code: message.script, runAt: message.runAt ? message.runAt : "document_idle"});
 						if (message.css) browser.tabs.insertCSS(tab.id, {code: message.css, runAt: message.runAt ? message.runAt : "document_idle"});
+
 					}
 				});
+				
+				response({result: "ABRIU"}); 
 			};
 			
 			break;

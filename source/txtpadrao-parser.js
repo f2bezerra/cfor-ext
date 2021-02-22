@@ -222,7 +222,7 @@ if (editor) {
 	//---Função para substituição das variáveis definidas pelo usuário
 	var replace_uservars = html => {
 		if (!html) return html;
-		return html.replace(/(?:\$(\w[\w_]*)(?:@(-?\d+(?:,-?\d+)?|[\w\*]+))?)(?!\w*\s*=)/g, (m0, name, format) => {
+		return html.replace(/(?:\$(_*?[a-z][\w_]*)(?:@(-?\d+(?:,-?\d+)?|[\w\*]+))?)(?!\w*\s*=)/ig, (m0, name, format) => {
 			if (!uservars.hasOwnProperty(name)) return "";
 			return formatValue(uservars[name], format);
 		});

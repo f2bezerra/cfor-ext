@@ -270,96 +270,97 @@ document.getElementById("ifrVisualizacao").addEventListener("load", function() {
 	
 	if (predata.autoconfirm || predata.upload) return;
 
-	docV.getElementById("ifrArvoreHtml").addEventListener("load", function() {
+	//Habilitar botões de ações para documento de acordo como conteúdo do documento **DESABILITADO***
+	// docV.getElementById("ifrArvoreHtml").addEventListener("load", function() {
 		
-		//LABORATORIO DE TESTES
- 		// addCommand("btnLab", "lab.svg", "Teste de Novidades", null, async e => {
+		// // //LABORATORIO DE TESTES
+ 		// // addCommand("btnLab", "lab.svg", "Teste de Novidades", null, async e => {
 			
-			// getDocumentoInfo({first: "*", until: "recibo"}).then(data => console.log(data));
+			// // consultarProcessoPGD(true).then(data => alert("Unidade de Esforço (UE) = " + data.ue));
 			
-		// });
+		// // });
  		
 		
-		var doc = this.contentDocument || this.contentWindow.document;
+		// var doc = this.contentDocument || this.contentWindow.document;
 
-		if (m = /Ofício n. (\d+\/\d{4})/i.exec(doc.body.innerHTML)) {
-			if (btnCpag = docV.getElementById("btnCforCpag")) btnCpag.remove();
+		// if (m = /Ofício n. (\d+\/\d{4})/i.exec(doc.body.innerHTML)) {
+			// if (btnCpag = docV.getElementById("btnCforCpag")) btnCpag.remove();
 			
-			if (mf = /\bFistel\s+(?:<[^>]*?>|\s)*\d{11}(?:(?:<\/?[^>]*?>|\s)*\s*(?:e|ou|,|e\/ou|&nbsp;|\s)*\d{11})*/i.exec(doc.body.innerHTML)) {
-				var ifrA = document.getElementById("ifrArvore");
-				var docA = ifrA ? (ifrA.contentDocument || ifrA.contentWindow.document) : null;
+			// if (mf = /\bFistel\s+(?:<[^>]*?>|\s)*\d{11}(?:(?:<\/?[^>]*?>|\s)*\s*(?:e|ou|,|e\/ou|&nbsp;|\s)*\d{11})*/i.exec(doc.body.innerHTML)) {
+				// var ifrA = document.getElementById("ifrArvore");
+				// var docA = ifrA ? (ifrA.contentDocument || ifrA.contentWindow.document) : null;
 				
-				if (docA && (ap = docA.querySelector('a[target=ifrVisualizacao]'))) {
-					if (mp = /(Outorga|Radiodifus[aã]o)\s*:\s*([^"]*)"[^>]*>([\d.\/-]+)\s*</i.exec(ap.innerHTML)) {
-						var nm = /Of[íi]cio n. (?:\d+\/\d{4}).+(?:<\/p>)?[\r\n]*(?:.*(?:&nbsp;<| <)(?:\/p>)?[\r\n]*)*(?:.*Senhor.*(?:\/p>)?[\r\n]*)?.*>(.+)<\/p>/i.exec(doc.body.innerHTML)[1];
-						var fs = [];
+				// if (docA && (ap = docA.querySelector('a[target=ifrVisualizacao]'))) {
+					// if (mp = /(Outorga|Radiodifus[aã]o)\s*:\s*([^"]*)"[^>]*>([\d.\/-]+)\s*</i.exec(ap.innerHTML)) {
+						// var nm = /Of[íi]cio n. (?:\d+\/\d{4}).+(?:<\/p>)?[\r\n]*(?:.*(?:&nbsp;<| <)(?:\/p>)?[\r\n]*)*(?:.*Senhor.*(?:\/p>)?[\r\n]*)?.*>(.+)<\/p>/i.exec(doc.body.innerHTML)[1];
+						// var fs = [];
 						
-						const regex_fs = /\d{11}/g;
-						while (f = regex_fs.exec(mf[0])) {
-							if (f.index === regex_fs.lastIndex) regex_fs.lastIndex++;
-							fs.push(f[0]);
-						}
-						fs = fs.join(",");
+						// const regex_fs = /\d{11}/g;
+						// while (f = regex_fs.exec(mf[0])) {
+							// if (f.index === regex_fs.lastIndex) regex_fs.lastIndex++;
+							// fs.push(f[0]);
+						// }
+						// fs = fs.join(",");
 						
-						var docr = (doc.body.textContent===undefined) ? doc.body.innerText : doc.body.textContent;
+						// var docr = (doc.body.textContent===undefined) ? doc.body.innerText : doc.body.textContent;
 						
 						
-						var a = document.createElement('a');
-						a.id = "btnCforCpag";
-						a.className = "botaoSEI";
-						a.href = "javascript:void(0);";
-						a.setAttribute("tabindex", "452");
-						a.addEventListener("click", function() {
-							var debitos = docr.match(/Regularidade\s+fiscal[\w ]+Anatel|constam?\s+d.bitos?/i)?"t":"l";
-							var servico;
-							if (mp[1] == "Outorga") {
-								switch (mp[2].toLowerCase()) {
-									case "rádio do cidadão": servico = "400"; break;
-									case "radioamador": servico = "302"; break;
-									case "slp": servico = "019"; break;
-									case "limitado móvel aeronáutico": servico = "507"; break;
-									case "limitado móvel marítimo": servico = "604"; break;
-									default: 
-										switch (true) {
-											case /Transmiss[ãa]o\s*de\s*Programas?/i.test(doc.body.innerHTML): servico = "251"; break;
-											case /Reportagem\s*Externa/i.test(doc.body.innerHTML): servico = "252"; break;
-											case /Ordens\s*Internas?/i.test(doc.body.innerHTML): servico = "253"; break;
-											case /para\s*Telecomando/i.test(doc.body.innerHTML): servico = "254"; break;
-											case /para\s*Telemedi[cç][ãa]o/i.test(doc.body.innerHTML): servico = "255"; break;
-										}
-								}
-							} 
+						// var a = document.createElement('a');
+						// a.id = "btnCforCpag";
+						// a.className = "botaoSEI";
+						// a.href = "javascript:void(0);";
+						// a.setAttribute("tabindex", "452");
+						// a.addEventListener("click", function() {
+							// var debitos = docr.match(/Regularidade\s+fiscal[\w ]+Anatel|constam?\s+d.bitos?/i)?"t":"l";
+							// var servico;
+							// if (mp[1] == "Outorga") {
+								// switch (mp[2].toLowerCase()) {
+									// case "rádio do cidadão": servico = "400"; break;
+									// case "radioamador": servico = "302"; break;
+									// case "slp": servico = "019"; break;
+									// case "limitado móvel aeronáutico": servico = "507"; break;
+									// case "limitado móvel marítimo": servico = "604"; break;
+									// default: 
+										// switch (true) {
+											// case /Transmiss[ãa]o\s*de\s*Programas?/i.test(doc.body.innerHTML): servico = "251"; break;
+											// case /Reportagem\s*Externa/i.test(doc.body.innerHTML): servico = "252"; break;
+											// case /Ordens\s*Internas?/i.test(doc.body.innerHTML): servico = "253"; break;
+											// case /para\s*Telecomando/i.test(doc.body.innerHTML): servico = "254"; break;
+											// case /para\s*Telemedi[cç][ãa]o/i.test(doc.body.innerHTML): servico = "255"; break;
+										// }
+								// }
+							// } 
 							
-							if (!servico) {
-								let ifrA = document.getElementById("ifrArvore");
-								let docA = ifrA.contentDocument || ifrA.contentWindow.document;
-								if (inputServico = docA.getElementById("hdnServico")) servico = $(inputServico).val();
-							}
+							// if (!servico) {
+								// let ifrA = document.getElementById("ifrArvore");
+								// let docA = ifrA.contentDocument || ifrA.contentWindow.document;
+								// if (inputServico = docA.getElementById("hdnServico")) servico = $(inputServico).val();
+							// }
 							
-							if (!servico) {
-								errorMessage("Serviço indefinido!");
-								return;
-							}
-							let value = mp[3].replace(/\D/g,"").substring(0,15) + ";" + servico + ";" + fs;
-							setClipboard(value);
-							notify("success", "Campos atualizados\n" + value);
+							// if (!servico) {
+								// errorMessage("Serviço indefinido!");
+								// return;
+							// }
+							// let value = mp[3].replace(/\D/g,"").substring(0,15) + ";" + servico + ";" + fs;
+							// setClipboard(value);
+							// notify("success", "Campos atualizados\n" + value);
 								
-							//addControlePagto(fs, mp[3], servico, debitos, nm);
-						});
+							// //addControlePagto(fs, mp[3], servico, debitos, nm);
+						// });
 						
-						var img = document.createElement("img");
-						img.className = "infraCorBarraSistema";
-						img.src = browser.runtime.getURL("assets/cpag.png");
-						img.title = "Incluir débito no Controle de Pagamentos";
+						// var img = document.createElement("img");
+						// img.className = "infraCorBarraSistema";
+						// img.src = browser.runtime.getURL("assets/cpag.png");
+						// img.title = "Incluir débito no Controle de Pagamentos";
 						
-						a.appendChild(img);
-						docV.getElementById("divArvoreAcoes").appendChild(a);
+						// a.appendChild(img);
+						// docV.getElementById("divArvoreAcoes").appendChild(a);
 						
-					}
-				} 
-			}
-		}
-	}, false);
+					// }
+				// } 
+			// }
+		// }
+	// }, false);
  }, false);
  
  

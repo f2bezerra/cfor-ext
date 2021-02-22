@@ -15,4 +15,9 @@ $('.infraCheckbox').on("change", function(e) {
 	});
 });
 
-$('#selEncaminhamentoAnl').val(2); //Finalizar Tarefa
+$('#selEncaminhamentoAnl').val(1); //selecionar 'Associar em Fila após finalização do Fluxo'
+$('#hdnEncaminhamentoAnl').val(1);
+
+$('#divFila').css("display", ""); //exibir caixa de seleção de fila
+$('#selFila').val(2); //selecionar fila 'TÉCNICA'
+$('#hdnFila').val(2);

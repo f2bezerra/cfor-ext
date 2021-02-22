@@ -649,6 +649,84 @@ function encodeXHRParams(data, charset) {
 	return params;
 }
 
+/*** Abrir janela  ***
+
+		url: endereço da página a ser aberta :: <string>
+		method: método da requisição :: ('GET' | 'POST')
+		data: dados da requisição quando utilizado o método 'POST' :: <string> | <object>
+		options: opções da requisição :: {contentType, timeout}
+			contentType: tipo do conteúdo. Padrão 'application/x-www-form-urlencoded;' :: <string>
+			timeout: tempo limite para retorno da requisição. Padrão 0 :: <number>
+		
+		return {status, ok, response} | null
+*/
+function openWindow(url, method = "get", params = null, options = null) {
+	if (!options) options = {};
+	let default_win_options = {location: 0, 
+							   status: 1, 
+							   resizable: 1, 
+							   scrollbars: 1, 
+						       width: 700, 
+							   height: 600};
+							   
+	let default_options = {dataFormId: undefined};
+						   
+	for (let prop in default_win_options) if (default_win_options.hasOwnProperty(prop) && options[prop] == undefined) options[prop] = default_win_options[prop];	
+	for (let prop in default_options) if (default_options.hasOwnProperty(prop) && default_options[prop] !== undefined && options[prop] == undefined) options[prop] = default_options[prop];	
+	
+	
+	
+	return new Promise((resolve, reject) => {
+		if (!options) options = "";
+		var width, height;
+		
+		url = absoluteUrl(url);;
+		var win_name = "win_" + Math.floor(Math.random() * 10000);
+		var win_options = "";
+		for (let prop in default_win_options) if (default_win_options.hasOwnProperty(prop) && options[prop] != undefined) win_options += (win_options?",":"") + prop + "=" + options[prop];
+		var win = method.toLowerCase() == "get" ? window.open(url, win_name, win_options) : window.open("", win_name, win_options);
+	  
+		try{
+			setTimeout(function() {
+				win.moveTo(((screen.availWidth/2) - (options.width/2)),((screen.availHeight/2) - (options.height/2)));
+				win.focus();
+			}, 200);
+
+		} catch(e) {
+		  // abrindo endereco de outro servidor ocorre erro de acesso
+		}
+		
+		var monitor = window.setInterval(function() {
+			if (win.closed){
+				clearInterval(monitor);
+				resolve(); 
+			}
+		},100);
+		
+		if (method.toLowerCase() == "post") {
+			let frm = document.createElement("form");
+			
+			if (params) {
+				for (let pname in params) {
+					if (params.hasOwnProperty(pname) && params[pname] !== undefined)  {
+						let hdn = document.createElement("input");
+						hdn.type = "hidden";
+						hdn.name = "pname";
+						hdn.value = params[pname];
+						frm.appendChild(hdn);
+					}
+				}
+			}
+			
+			frm.onload = () => {alert('carregou')};
+			frm.target = name;
+			frm.action = url;
+			frm.submit();
+		}
+		
+		
+	});
+}
 
 
 /*** Fazer requisição SÍNCRONA ***
@@ -1692,6 +1770,65 @@ function parseMarkdown(text) {
 	});
 	
 	text = text.replace(/\n\s*-{3,}\s*(?:\n|$)/g, "<hr>");
+	
+	text = text.replace(/^(?:\s*\|.+\|\n)+/mg, (table) => {
+		let result = "<table>";
+		
+		const regex_rows = /^\s*\|(.*)\|/gm;
+		let m_row, rows = [], aligns, row;
+
+		while (m_row = regex_rows.exec(table)) {
+			if (m_row.index === regex_rows.lastIndex) regex_rows.lastIndex++;
+			let cols = m_row[1].split("|"); 
+			
+			if (cols && cols.length) {
+				if (!aligns && m_row[1].match(/^[:\-|]+$/)) aligns = cols;
+				else rows.push(cols); 
+			}
+		}
+
+		if (aligns) {
+			aligns = aligns.map((align) => {
+				if (align.endsWith(":")) {
+					if (align.startsWith(":")) return ' style="text-align:center;"';
+					else return ' style="text-align:right;"';
+				} else if (align.startsWith(":")) return ' style="text-align:left;"';
+				else return '';
+			});
+			
+			
+			result += "<thead><tr>";
+			row = rows.shift();
+			row.forEach((col, index) => {
+				result += "<th";
+				if (index < aligns.length) result += aligns[index];
+				result += ">" + col + "</th>";
+			});
+			result += "</tr></thead>";
+		}
+		
+		if (rows.length) {
+			result += "<tbody>";
+			
+			while (row = rows.shift()) {
+				result += "<tr>";
+				row.forEach((col, index) => {
+					result += "<td";
+					if (index < aligns.length) result += aligns[index];
+					result += ">" + col + "</td>";
+				});
+				result += "</tr>";
+			}
+			
+			result += "</tbody>";
+		}
+
+		result += "</table>";
+		
+		return result;
+		
+	});
+	
 	
 	text = text.replace(/\n/g, "<br>").replace(/\t/g, "");
 	
@@ -3153,7 +3290,7 @@ function solve(expr, undef, vars = null, unescape = true) {
 	if (typeof undef == "string") undef = new RegExp(undef, "i");
 	if (vars === true) vars = {};
 	
-	if (vars && (s = expr.match(/^\s*\$([a-z][\w_]*)\s*$/i))) {
+	if (vars && (s = expr.match(/^\s*\$(_*?[a-z][\w_]*)\s*$/i))) {
 		value = vars[s[1]]; 
 		if (value != undefined) {
 			if (Array.isArray(value)) return value.length;
@@ -3191,7 +3328,7 @@ function solve(expr, undef, vars = null, unescape = true) {
 	
 	expr = expr.replace(/\t+/g," ").trim();
 	
-	if (vars && (s = expr.match(/^\s*\$([a-z][\w_]*)\s*=\s*([^=].*?)\s*$/i))) {
+	if (vars && (s = expr.match(/^\s*\$(_*?[a-z][\w_]*)\s*=\s*([^=].*?)\s*$/i))) {
 	
 		if (s2 = s[2].match(/^\s*\$([a-z][\w_]*)\s*$/i)) value = vars[s2[1]]; 
 		else value = solve(s[2], undef, vars, unescape);
@@ -3217,7 +3354,10 @@ function solve(expr, undef, vars = null, unescape = true) {
 		if (op1 === undefined || op2 === undefined) return undefined;
 		
 		if (Array.isArray(op1)) op1 = op1.length;
+		else if (typeof op1 == "string") op1 = op1.trim();
+		
 		if (Array.isArray(op2)) op2 = op2.length;
+		else if (typeof op2 == "string") op2 = op2.trim();
 		
 		let op1_date, op2_date;
 		

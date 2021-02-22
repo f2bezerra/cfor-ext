@@ -230,7 +230,7 @@ function getSEI(url) {
 
 
 //Postar dados no SEI
-function postSEI(form, options) {
+async function postSEI(form, options) {
 	if (!form) return Promise.reject("Formulário não informado");
 	
 	if (!options) return Promise.reject("Argumentos inválidos");

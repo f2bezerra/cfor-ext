@@ -1,7 +1,7 @@
 ﻿$(function() {
 	//Controle de Lotação
 	var lotacao = getCurrentLotacao();
-	if (lotacao && !("GR05OR|GR05AF".includes(lotacao))) {
+	if (lotacao && !("GR05|GR05OR|GR05AF|CBC2".includes(lotacao))) {
 		if (!document.baseURI.match(/controlador\.php\?acao=infra_configurar&.*/i)) {
 			if (anchor = top.window.document.getElementById('lnkConfiguracaoSistema')) {
 				browser.runtime.sendMessage({action: "navigate", url: absoluteUrl($(anchor).attr("href")), script: undefined});			
@@ -17,16 +17,21 @@
 	
 	
 	//Controle de Versão
-	const CURRENT_NEWS = 3;
+	const CURRENT_NEWS = 3.3;
 
 	if (!localStorage.cfor_lastnews || localStorage.cfor_lastnews < CURRENT_NEWS) {
 		if (!$(top.window.document.body).find("#btn_cfornews").length) {
-			let $btn_news  = $(`<a id="btn_cfornews" class="btn-pulse btn-pulse-red btn-floating" title="Novidades ${browser.runtime.getManifest().version}"><img style="vertical-align: middle; margin: 0; transform: scale(0.87);"></a>`);
+			let $btn_news  = $(`<a id="btn_cfornews" class="btn-pulse btn-pulse-red btn-floating" title="Notas da Atualização ${browser.runtime.getManifest().version}"><img style="vertical-align: middle; margin: 0; transform: scale(0.87);"></a>`);
 			$btn_news.find('img').attr("src", browser.runtime.getURL("assets/logo-24w.png"));
 			$(top.window.document.body).append($btn_news);
 			
 			$btn_news.click(e => {
-				chrome.runtime.sendMessage({action: "open", url: getCforUrl("/extension/help/news.php")});
+				
+				$.ajax({url: browser.runtime.getURL("doc/version_notes.md"), dataType: "text"}).done(content => {
+					let version = browser.runtime.getManifest().version;
+					popupMessage("@@" + content + "@@", "Notas da Atualização  " + version);
+				});
+				
 				$btn_news.remove();
 				localStorage.cfor_lastnews = CURRENT_NEWS;
 			});
@@ -34,7 +39,7 @@
 	}
 
 	 
-	//Atalhos
+	//Atalhos gerais para o SEI
 	 let keyDownHandler = function (e) {
 		if (e.ctrlKey && e.key == "Enter" && (btnSalvar = $(':submit[value=Salvar]').get(0) || $(':button[value="Confirmar Dados"]').get(0) || $(':button[value="Salvar"]').get(0))) {
 			e.preventDefault();

@@ -34,6 +34,7 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 		else if (processo.servico) processo.tipo = processo.servico.tipo;
 		
 		
+		//let url_alterar_contato = (m = data.match(/controlador\.php\?acao=contato_alterar[^'"]*?/i)) ? m[0] : null;
 		
 		var $first = $html.find("#selInteressadosProcedimento option:first");
 		processo.interessados = $html.find("#selInteressadosProcedimento option").map(function () { 
@@ -348,10 +349,6 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 								values += `${data.name}:${data.value};`;
 								$(doc).find("#txaObservacoes").val(values);
 							}).then(() => {
-/* 								let $f = $(`<p class="proc-field" field-name="${identityNormalize(data.name)}"><label>${data.name}: </label><span class='actionable'>${data.value}</span></p>`);
-								let last_p = $(divDt).find('p:contains("Interessado:"):last').get(0) || $(divDt).find('p:contains("Interessados:"):last').get(0) || $(divDt).find('p:last').get(0);
-								$(last_p).before($f);
-								applyActionPanel($f.find('.actionable')); */
 								refresh_all_panels(data, true);
  								notify("success", "Campo atualizado");
 							}).catch(e => notify("fail", "Inclusão de campo falhou\n" + e.message));
