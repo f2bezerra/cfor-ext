@@ -269,6 +269,19 @@ document.getElementById("ifrVisualizacao").addEventListener("load", function() {
 	if (predata.upload && ($upfile = $(docV).find('#filArquivo')) && $upfile.is(':visible')) $upfile.trigger('click');
 	
 	if (predata.autoconfirm || predata.upload) return;
+	
+	// docV.getElementById("ifrArvoreHtml").addEventListener("load", function() {
+ 		// addCommand("btnLab", "lab.svg", "Teste de Novidades", null, async e => {
+			// let info = getCurrentProcInfo();
+			// if (!info.cpf) {
+				// errorMessage("CPF do interessado não informado.\n\nInforme no próprio cadastro do interessado **ou** inclua um campo CPF no processo.", "RA");
+				// return;
+			// }
+			
+			// waitMessage("Consultando RA...");
+			// consultarUrlServico(302, info.cpf).then(url => browser.runtime.sendMessage({action: "open", url: [url]})).finally(() => waitMessage(null)).catch(error => errorMessage(error, "RA"));
+		// });
+	// });
 
 	//Habilitar botões de ações para documento de acordo como conteúdo do documento **DESABILITADO***
 	// docV.getElementById("ifrArvoreHtml").addEventListener("load", function() {

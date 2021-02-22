@@ -840,13 +840,14 @@ function postFormData(form_url, options) {
 	var form = form_url;
 	
 	if (!options) return Promise.reject("Argumentos inválidos");
-	if (typeof options == "function" || (typeof options == "object" && !options.data)) options = {data: options};
+	if (typeof options == "function" || (typeof options == "object" && !options.data && !options.fetchParams)) options = {data: options};
 	
-	if (!options.data) return Promise.reject("Dados nulos");
+	if (!options.data && !options.fetchParams) return Promise.reject("Dados nulos");
 	
 	let default_options = {data: undefined,			// {dados} | function(data) para postar
 						   formId: undefined,		// identificador do formulário'
 						   url: undefined,			// url diferente da definida no formulário
+						   onlyFetch: false,		// apenas buscar
 						   fetchMethod: "get",		// método padrão para busca quando informado uma url
 						   fetchParams: undefined,	// parâmetros para busca
 						   charset: "iso-8859-1"};	// iso-8859-1 | utf-8
@@ -896,6 +897,8 @@ function postFormData(form_url, options) {
 			
 		} else resolve(form);
 	}).then(html => {
+		
+		if (options.onlyFetch) return Promise.resolve(html);
 		
 		if (is_url) form = options.formId ? $(html).find('#' + options.formId).get(0) || $(html).filter('#' + options.formId).get(0) : $(html).find('form').get(0) || $(html).filter('form').get(0);
 		else form = $(form).get(0);

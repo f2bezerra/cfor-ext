@@ -298,8 +298,8 @@ async function consultarUrlServico(servico, cpfj_indicativo) {
 	if (!servico) return Promise.reject("Serviço não identificado");
 	servico = Number(servico);
 	
-	switch (servico) {
-		case 302: url = "http://sistemasnet/scra/Consulta/Tela.asp"; break;
+		switch (servico) {
+			case 302: url = "http://sistemasnet/scra/Consulta/Tela.asp"; break;
 		case 400: url = "http://sistemasnet/scpx/Consulta/Tela.asp"; break;
 		case 507: url = "http://sistemasnet/stel/scma/Consulta/Tela.asp"; break;
 		case 604: url = "http://sistemasnet/stel/scmm/Consulta/Tela.asp"; break;
@@ -312,7 +312,7 @@ async function consultarUrlServico(servico, cpfj_indicativo) {
 	if (cpfj && !validateCpfj(cpfj)) return Promise.reject("CPF/CNPJ inválido");
 	if (indicativo && (indicativo.length < 4 || indicativo.length > 8)) return Promise.reject(`Indicativo '${indicativo}' inválido`);
 	
-	let result = await postFormData(url, {acao: "v", btnpVencidas: "n", btnpVincendas: "n", btnpHabSemEstacao: "n", btnpInativasRF: "n", pNumCnpjCpf: cpfj, pIndicativo: indicativo, pindTipoComparacao: "e"}).then(html => {
+	let result = await postFormData(url, {onlyFetch: true, fetchMethod: "post", fetchParams: {acao: "v", btnpVencidas: "n", btnpVincendas: "n", btnpHabSemEstacao: "n", btnpInativasRF: "n", pNumCNPJCPF: cpfj, pIndicativo: indicativo, pindTipoComparacao: "e"}}).then(html => {
 		if (m = html.match(/\bTela.asp\?.*\bpidtHabilitacao=(\d+)[^'"]*/i)) return m[1];
 		
 		let regex = /\s*Ativ[ao]\s*/i;
