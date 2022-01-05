@@ -41,7 +41,10 @@
 	 
 	//Atalhos gerais para o SEI
 	 let keyDownHandler = function (e) {
-		if (e.ctrlKey && e.key == "Enter" && (btnSalvar = $(':submit[value=Salvar]').get(0) || $(':button[value="Confirmar Dados"]').get(0) || $(':button[value="Salvar"]').get(0))) {
+		if (e.ctrlKey && e.key == "Enter" && (btnSalvar = $(':submit[value=Salvar]').get(0) || 
+														  $(':button[value="Confirmar Dados"]').get(0) || 
+														  $(':button[value="Salvar"]').get(0) ||
+														  $('button:contains(Salvar)').get(0))) {
 			e.preventDefault();
 			e.stopPropagation();
 			for (var i = 0; i < top.window.parent.frames.length; i++) top.window.parent.frames[i].document.removeEventListener('keydown', keyDownHandler);

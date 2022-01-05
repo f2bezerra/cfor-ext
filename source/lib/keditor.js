@@ -325,28 +325,55 @@ function open_dialog(id, title, width, height, button, fields, callback) {
 	
 	$('body').append(`<div tabindex="-1" style="display: none; position: fixed; z-index: 10000; top: 0px; left: 0px; background-color: white; opacity: 0.5; width: ${screen.width}px; height: ${screen.height}px;" class="cke_dialog_background_cover"></div>`);
 	$('body').append(dlg);
+	
+	let start_pos;
+	$(dlg).find('.cke_dialog_title').mousedown((e) => {
+		start_pos = {x: e.screenX, y: e.screenY};
+		
+		$(document).mousemove((e) => {
+			let cke_dlg = $(dlg).find('.cke_dialog').get(0);
+			let actual_pos = {x: cke_dlg.offsetLeft, y: cke_dlg.offsetTop};
+			$(cke_dlg).css("left", actual_pos.x + e.screenX - start_pos.x);
+			$(cke_dlg).css("top", actual_pos.y + e.screenY - start_pos.y);
+			start_pos = {x: e.screenX, y: e.screenY};
+			console.log(start_pos);
+		}).mouseup((e) => {
+			$(document).off("mousemove mouseup");
+		});
+		
+	});	
+	
+	
 	let $dlg_body = $(dlg).find('.cke_dialog_page_contents tbody');
 	
-	let $td, first_elem;
+	let $tr, $td, first_elem;
 	for (let f of fields) {
-		if (!f.no_br || !$td) {
-			$td = $('<td class="cke_dialog_ui_vbox_child"></td>');
-			$dlg_body.append("<tr></tr>").append($td);
-		}
+		
+		if (!f.no_br || !$tr) {
+			$tr = $("<tr />");
+			$dlg_body.append($tr);
+		}	
+		
+		$td = $('<td class="cke_dialog_ui_vbox_child"></td>');
+		$tr.append($td);
 		
 		let $div_f = $('<div></div>'); 
 		$td.append($div_f);
 		
-		if (f.label) $div_f.append(`<label id="${f.id}_label" class="cke_dialog_ui_labeled_label cke_required" for="${f.id}">${f.label}</label>`);
-		
-		if (!f.no_br) {
-			$div_f = $('<div></div>'); 
-			$td.append($div_f);
+		if (f.label) {
+			$div_f.append(`<label id="${f.id}_label" class="cke_dialog_ui_labeled_label cke_required" for="${f.id}">${f.label}</label>`);
+			if (f.label_position == 'top') $div_f.append('<br>');
 		}
 
 		switch (f.type) {
 			case "textarea": 
 				f.elem = $(`<textarea id="${f.id}" rows="${f.rows}" cols="${f.cols}" class="cke_dialog_ui_input_textarea" aria-required="true" style="white-space: normal!important;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>`).get(0);
+				break;
+				
+			case "edtable":
+				f.elem = $(`<table id="${f.id}" class="cke_dialog_ui_edtable" aria-required="true"></table>`).get(0);
+				$(f.elem).edtable(f.options);
+				
 				break;
 				
 			case "text":
@@ -384,6 +411,8 @@ function open_dialog(id, title, width, height, button, fields, callback) {
 				
 		}
 		
+		if (f.width) $(f.elem).css("width", f.width);
+		
 		$elem = f.type == "interval" ? $(f.elem).find("input") : $(f.elem);
 		
 		if (f.shortcut) {
@@ -401,7 +430,14 @@ function open_dialog(id, title, width, height, button, fields, callback) {
 			if (f.intellisense) enableIntellisense(elem, f.intellisense);
 			
 			if (!first_elem) first_elem = elem;
-			if (f.value) if (f.type == "interval") $(elem).val(Array.isArray(f.value) && index < f.value.length?f.value[index]:""); else  $(elem).val(f.value);
+			if (f.value) {
+				switch (f.type) {
+					case "interval": $(elem).val(Array.isArray(f.value) && index < f.value.length?f.value[index]:""); break;
+					case "edtable": f.elem.EdTable.load(f.value); break;
+
+					default: $(elem).val(f.value);
+				}
+			} 
 		});
 		
 
@@ -409,13 +445,45 @@ function open_dialog(id, title, width, height, button, fields, callback) {
 	}
 	
 	$(dlg).find('a.cke_dialog_close_button,a.cke_dialog_ui_button_cancel,.cke_dialog_ui_button_ok').on('click', (event) => {
-		var output = {};
-		for (let f of fields) {
-			if (f.type == "interval") output[f.id] = [$(f.elem).find("input").first().val(), $(f.elem).find("input").last().val()];
-			else output[f.id] = $(f.elem).val();
+		var output = {}, fds = {};
+		
+		for (var f of fields) {
+			switch (f.type) {
+				case "interval": 
+					output[f.id] = [$(f.elem).find("input").first().val(), $(f.elem).find("input").last().val()];
+					Object.defineProperty(f, "value", {
+						get: () => {return output[f.id]},
+						set: (v1, v2=null) => { 
+							if (!Array.isArray(v1)) v1 = [v1, v2];
+							$(f.elem).find("input").first().val(v1[0]);
+							$(f.elem).find("input").first().val(v1[1]);
+						}
+					});
+					
+					break
+					
+				case "edtable":
+					output[f.id] = f.elem.EdTable.get();
+					Object.defineProperty(f, "value", {
+						get: () => {return f.elem.EdTable.get()},
+						set: v => {f.elem.EdTable.load(v)}
+					});
+					
+					break;
+					
+				default: 
+					output[f.id] = $(f.elem).val();
+					Object.defineProperty(f, "value", {
+						get: () => {return $(f.elem).val()},
+						set: v => {$(f.elem).val(v)}
+					});
+				
+			}
+			fds[f.id] = f;
 		}
 		
-		if (callback && !callback($(event.currentTarget).attr("cfor-action"), output)) return;
+		
+		if (callback && !callback({dlg: dlg, fields: fds, action: $(event.currentTarget).attr("cfor-action"), data: output})) return;
 		$(event.currentTarget).closest('.cke_editor_txaConteudo_dialog').get(0).remove();
 		$('.cke_dialog_background_cover').remove();
 	});

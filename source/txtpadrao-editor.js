@@ -39,6 +39,10 @@ $(function() {
 		let str_init = "%INIT(@tipo_processo@,@especificacao_processo@,@cpf_interessado@,@cnpj_interessado@,@cpf_destinatario@,@cnpj_destinatario@)%";
 		if (html.match(/%field\([^)]+\)%|\$\w+/i)) str_init += "%FIELDS(@observacao_processo@)%";
 		if (html.match(/%ref\([^)]+\)%/i)) str_init += "%REFS(@observacao_documento@)%";
+		if (doc.body.varInputs) {
+			let inputs = JSON.stringify(doc.body.varInputs).replace(/(?<=\s*{|\s*,)\s*"([^"]+)"\s*:\s*/g, "$1:");
+			str_init += `%INPUTS(${inputs})%`;
+		}
 
 		html = `<p style="display: none;">${str_init}</p>` + html;
 
@@ -61,6 +65,18 @@ $(function() {
 		
 		if (!(main_toolbox = document.getElementById("cke_2_toolbox")) || !doc || doc.readyState != "complete") return;
 		clearInterval(hs);
+		
+		if (m = doc.body.innerHTML.match(/<p[^>]*>%INIT[\w\W]+%INPUTS\(([\w\W]*?)\)%[\w\W]*?<\/p>/i)) {
+			if (m[1]) {
+				m[1] = m[1].replace(/(?<=[{,:]\s*)[a-z_]\w*(?=\s*:)/ig, '"$&"');
+				try {
+					doc.body.varInputs = JSON.parse(m[1]);
+				} catch(ex) {
+					doc.body.varInputs = undefined;
+				}
+			}
+		}
+		
 
 		//Lista de campos para inserção no texto padrão
 		var fdfns = [{group: "Campos",
@@ -100,7 +116,6 @@ $(function() {
 			
 			
 			if (is_fun_template = (data.match(/[^<]*\<[^>]*?\>\?.*/) != null)) {
-				//data = data.replace(/<([^>:]*?)(?::([^>]*?))?>\?/g, '<span contenteditable="true" spellcheck="false" list="$2">$1</span>');
 				data = data.replace(/<([^>:@]*?)(?::([^>]*?)|@([^>]*?))?>\?/g, '<span contenteditable="true" spellcheck="false" list="$2" format="$3">$1</span>');
 			}
 
@@ -263,6 +278,8 @@ $(function() {
 		
 		//--- Criar barra e botões de ferramenta
 		var toolbar = create_toolbar(main_toolbox);
+		var btn_in = add_btn(toolbar, "cke_cfor_in", "Tabela de Entradas", "inputs.png", {enabled: true});
+		add_separator(toolbar);
 		var btn_field = add_btn(toolbar, "cke_cfor_field", "Inserir Campos e Funções", "field.png", {list: fdfns, enabled: false}, insert_fdfn);
 		var btn_filter = add_btn(toolbar, "cke_cfor_filter", "Editar Filtros", "filter.png", {enabled: false});
 		add_separator(toolbar);
@@ -311,13 +328,11 @@ $(function() {
 		
 			
 			open_dialog("cfor_condition_dlg", `Condição de ${elems[0].nodeName == "TR"?"Linha":"Item"}`, 400, 100, "Limpar",
-						[{id: "cfor_condition", type: "textarea", label: "Condição", label_position: "top", rows: 5, cols: 20, value: condition, intellisense: edit_intellisense_options}], (a, f) => {
-							if (a == "limpar") f.cfor_condition = null;
-							else if (a != "ok") return true;
-							
-							
+						[{id: "cfor_condition", type: "textarea", label: "Condição", label_position: "top", rows: 5, cols: 20, value: condition, intellisense: edit_intellisense_options}], e => {
+							if (e.action == "limpar") e.data.cfor_condition = null;
+							else if (e.action != "ok") return true;
 
-							condition = f.cfor_condition?f.cfor_condition.trim():undefined;
+							condition = e.data.cfor_condition?e.data.cfor_condition.trim():undefined;
 							elems.forEach((item, index) => {
 								if (condition) $(item).attr("condition", condition).removeAttr("title").tooltip(item.nodeName == "TR"?tr_tooltip_options:li_tooltip_options);
 								else $(item).removeAttr("condition").removeAttr("title").untooltip();
@@ -331,12 +346,12 @@ $(function() {
  		var edit_bookmark = function(elem) {
 				
 			open_dialog("cfor_bookmark_dlg", "Marcador", 200, 50, "Limpar",
-						[{id: "cfor_bookmark", type: "text", label: "Identificador:", label_position: "top", value: $(elem).attr('bookmark')}], (a, f) => {
+						[{id: "cfor_bookmark", type: "text", label: "Identificador:", label_position: "top", value: $(elem).attr('bookmark')}], e => {
 
-				if (a == "limpar") f.cfor_bookmark = null;
-				else if (a != "ok") return true;
+				if (e.action == "limpar") e.data.cfor_bookmark = null;
+				else if (e.action != "ok") return true;
 				
-				let bm = f.cfor_bookmark?identityNormalize(f.cfor_bookmark):undefined;
+				let bm = e.data.cfor_bookmark?identityNormalize(e.data.cfor_bookmark):undefined;
 				if (bm) $(elem).attr('bookmark', bm).removeAttr('title').tooltip(bm_tooltip_options);
 				else $(elem).removeAttr('bookmark').removeAttr('title').untooltip();
 				
@@ -450,6 +465,37 @@ $(function() {
 			if (td = $(sel.anchorNode.parentElement).closest('td').get(0)) edit_bookmark(td);
 		};
 		
+		// Ação do botão de tabela de entradas
+ 		btn_in.fn = function (e) {
+			
+			open_dialog("inputs_dlg", "Tabela de Entradas", 800, 50, "Limpar",
+						[{id: "vars", type: "edtable", label: null, label_position: "top", value: doc.body.varInputs, width: "800px", 
+						
+						  options: {
+							  fixedHeaderClass: "vars-table",
+							  
+							  columns: [{id: "name", type: "text", label: "Nome", width: "1rs"},
+										{id: "label", type: "text", label: "Rótulo", width: "2.5rs"},
+										{id: "type", type: "select", label: "Tipo", options:"text,check,calendar,choice", width: "1rs"},
+										{id: "options", type: "text", label: "Opções", width: "2rs"},
+										{id: "value", type: "text", label: "Valor", width: "1rs"},
+										{id: "visibility", type: "text", label: "Visibilidade", width: "2rs"}
+									   ]
+						  }
+						  
+						 }], e => {
+
+				if (e.action == "limpar") {
+					e.fields.vars.value = null;
+					return false;
+ 				} else if (e.action != "ok") return true;
+				
+				doc.body.varInputs = e.data.vars;
+				return true;
+			});
+			
+		};		
+		
 		// Ação do botão de tabela dinâmica
  		btn_tb.fn = function (e) {
 			let sel = doc.getSelection();
@@ -492,16 +538,16 @@ $(function() {
 			open_dialog("dtable_dlg", "Tabela Dinâmica", 400, 50, "Limpar",
 						[{id: "id", type: "text", label: "Id:", label_position: "top", value: default_id},
 						 {id: "tabela", type: "select", label: "Tabela:", label_position: "top", items: "lancto=Lançamentos", value: default_table},
-						 {id: "dados", type: "text", label: "Dados:", label_position: "top", value: default_data, intellisense: edit_intellisense_options}], (a, f) => {
+						 {id: "dados", type: "text", label: "Dados:", label_position: "top", value: default_data, intellisense: edit_intellisense_options}], e => {
 
-				if (a == "limpar") {
-					f.id = "";
-					f.dados = "";
+				if (e.action == "limpar") {
+					e.fields.id.value = "";
+					e.fields.dados.value = "";
 					return false;
- 				} else if (a != "ok") return true;
+ 				} else if (e.action != "ok") return true;
 				
 				let columns;
-				switch (f.tabela) {
+				switch (e.data.tabela) {
 					case "lancto": columns = [{header: "Fistel", class: "Tabela_Texto_Centralizado", bind: "fistel"},
 											  {header: "Seq", class: "Tabela_Texto_Centralizado", bind: "seq"},
 											  {header: "Receita", class: "Tabela_Texto_Alinhado_Esquerda", bind: "receita"},
@@ -514,7 +560,7 @@ $(function() {
 
 				
 				if (table) {
-					if (default_table && default_table != f.tabela) {
+					if (default_table && default_table != e.data.tabela) {
 						$(table).find('thead,tbody,tr').remove();
 						$(table).append('<thead />');
 						$(table).append('<tbody />');
@@ -531,9 +577,9 @@ $(function() {
 						$(table).find('tbody').append($tr_tbody);
 					}
 					
-					$(table).attr("dynamic-table", f.tabela).attr("dynamic-table-id", f.id).attr("dynamic-table-data", f.dados);
+					$(table).attr("dynamic-table", e.data.tabela).attr("dynamic-table-id", e.data.id).attr("dynamic-table-data", e.data.dados);
 				} else {
-					let $table = $(`<table dynamic-table="lancto" dynamic-table-id="${f.id}" dynamic-table-data="${f.dados}" cellspacing="0" cellpadding="0" border="1" style="margin-left:auto;margin-right:auto;" spellcheck="false">
+					let $table = $(`<table dynamic-table="lancto" dynamic-table-id="${e.data.id}" dynamic-table-data="${e.data.dados}" cellspacing="0" cellpadding="0" border="1" style="margin-left:auto;margin-right:auto;" spellcheck="false">
 										<thead />
 										<tbody />
 									</table>`);

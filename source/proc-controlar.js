@@ -247,9 +247,6 @@ addCommand("btnUMI", "date-in.png", "Determinar data da última manifestação d
 });
 
 
-//Criar botão de captura
-addCommand("btnGetProc", "get-proc.png", "Assumir processo para análise", null, captureProcesso);
-
 updateTable("#tblProcessosRecebidos");
 updateTable("#tblProcessosGerados");
 updateTable("#tblProcessosDetalhado");

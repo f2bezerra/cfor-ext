@@ -178,7 +178,11 @@ a.botaoSEI img:hover {
 }
 
 
-/*** SINTAXE E CODIFICAÇÃO ***/
+/*** EDITOR ***/
+
+td.cke_dialog_ui_vbox_child:not(td:first-child) {
+    padding-left: 10px !important;
+}
 
 code {
 	font-family: "Lucida Console", Monaco, monospace!important;

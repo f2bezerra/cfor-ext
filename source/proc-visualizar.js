@@ -14,6 +14,9 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 	var is_editable = (m[1].toLowerCase() == "alterar");
 	
 	$.get(url, function(data) {
+		
+		console.log("Leitura Processo OK");
+		
 		let $html = $(data);
 		let m_tipo; 
 		var processo = {};
@@ -390,6 +393,8 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 							}
 		});
 		
+	}).fail(function(jqXHR, textStatus, errorThrown) {
+		console.log("Status: ", textStatus, "Error: ", errorThrown);
 	});
 
 	$('body').ready(function() {

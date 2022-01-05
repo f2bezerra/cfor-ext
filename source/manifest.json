@@ -1,7 +1,7 @@
 {
 	"manifest_version": 2,
 	"name": "cfor-ext",
-	"version": "3.3.3",
+	"version": "3.5.0",
 	"author": "Fabio Fernandes Bezerra",
 	"description": "Extensão de funcionalidades do SEI",
 	
@@ -37,7 +37,8 @@
 						 
 						{"matches": ["*://*.br/sei/controlador.php?acao=texto_padrao_interno_alterar*", "*://*.br/sei/controlador.php?acao=texto_padrao_interno_cadastrar*"],
 						 "all_frames": true,
-						 "js": ["lib/keditor.js", "lib/intellisense.js", "txtpadrao-editor.js"]},
+						 "css": ["lib/keditor.css", "lib/edtable.css"],
+						 "js": ["lib/keditor.js", "lib/intellisense.js", "lib/edtable.js", "txtpadrao-editor.js"]},
 						 
 						{"matches": ["*://*.br/sei/controlador.php?acao=texto_padrao_interno_consultar*"],
 						 "all_frames": true,

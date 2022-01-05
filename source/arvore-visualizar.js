@@ -20,7 +20,6 @@
 		
 		if ($('#divArvoreAcoes a[onclick*="reabrirProcesso()"]').length) {
 			addFuncoesAnatel(false);
-			addNextProc();
 		} else {
 			addFuncoesAnatel(true);
 		}
@@ -53,13 +52,14 @@ function addNovo() {
 	
 	let items = [{text: "Externo", items: [
 						{id: "ext-reg", text: "Consulta de Regularidade"}, 
-						{id: "ext-sis", text: "Consulta de Sistema"}, 
+						/*{id: "ext-sis", text: "Consulta de Sistema"}, */
 						{id: "ext-lic", text: "Licenças Impressas"}, 
 						{id: "ext-coer", text: "COER"}, 
 						{id: "ext-dec", text: "Declaração de Aeronave"}, 
-						{id: "rel-sis", text: "Relatório de Sistema"}, 
+						{id: "rel-sis", text: "Relatório de ..."}, 
 						{id: "reg-vis", text: "Registro de Visão"}, 
-						{id: "ext-lan", text: "Extrato de Lançamentos"}]}, 
+						{id: "ext-lan", text: "Extrato de Lançamentos"},
+						{id: "ext-pub", text: "Publicação DOU"}]}, 
 				 "-",
 				 {id: "checklist", text: "Lista de Verificação"},
 				 {id: "analise", text: "Análise Técnica"},
@@ -247,10 +247,18 @@ function addNovo() {
 					predata.upload = true;
 					break;
 					
+				case "ext-pub":
+					url = $html.find("[data-desc*=externo] .ancoraOpcao").attr("href");
+					predata.tipo = "Publicação";
+					predata.desc = "DOU de " + (new Date()).addDate(0).toDateBR();
+					predata.acesso = 0;
+					predata.upload = true;
+					break;
+					
 				case "rel-sis":
 					url = $html.find("[data-desc*=externo] .ancoraOpcao").attr("href");
 					predata.tipo = "Relatório";
-					predata.desc = "de Sistema";
+					predata.desc = "de ";
 					predata.acesso = 2;
 					predata.upload = true;
 					break;
@@ -537,11 +545,6 @@ function addBlocoAssinatura() {
 		
 	});							  
 	
-}
-
-
-function addNextProc() {
-	addCommand("btnGetNext", "next-proc.png", "Analisar próximo processo", null, captureNextProcesso);
 }
 
 

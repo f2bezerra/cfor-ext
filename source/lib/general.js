@@ -2229,7 +2229,7 @@ function openProcessDlg(title, options) {
 /*** Exibir janela de formulário ***
 
 		fields: lista de campos do formulário :: [<field> | <row-fields> | <group-fields> | <tab-fields>, ...]
-			<field>: objeto especificador de campo :: {id, type, label, value, width, readonly, required, autofocus, shortcut, <atributos-específicos>}
+			<field>: objeto especificador de campo :: {id, type, label, value, width, readonly, required, autofocus, shortcut, visibility, <atributos-específicos>}
 				id: identificador do campo :: <string>
 				type: tipo do campo :: (number|text|password|static|radio|check|textarea|date|select)
 					number: tipo numérico. Atributos específicos:
@@ -2270,6 +2270,7 @@ function openProcessDlg(title, options) {
 				validation: validação do campo :: <RegExp> | <string>
 				message: mensagem caso a validação falhe
 				autofocus: indica que o campo deve receber o foco inicial :: <boolean>
+				visibility: expressão para determinar vibilidade do campo dinamicamente. Referenciar outros compos por $<id> :: <string>
 				shortcut: configuração de tecla de atalho :: {key, callback}
 					key: identificar da tecla de atalho :: <string>
 					callback: função chamada quando a tecla de atalho é pressionada
@@ -2365,8 +2366,8 @@ function openFormDlg(fields, title, options, validation) {
 	var dlg = doc.createElement("div");
 	dlg.id = "div-form-dlg";
 	$(dlg).addClass("modal-dlg-form");
-
-	let row, first_elem, last_group = undefined, container = dlg, has_field_validation = false;
+	
+	let row, first_elem, last_group = undefined, container = dlg, has_field_validation = false, has_field_visibility = false;
 	for (let f of fields) {
 		if (typeof f == "string") {
 			if (f.match(/\s*-+\s*/)) f = fields[fields.indexOf(f)] = {type: "hr"};
@@ -2541,6 +2542,11 @@ function openFormDlg(fields, title, options, validation) {
 			if (f.validation instanceof RegExp) has_field_validation = true;
 			else f.validation = null;
 		}
+		
+		if (f.visibility != undefined) {
+			f.visibility = f.visibility.trim();
+			if (f.visibility) has_field_visibility = true;
+		}
 	}
 	
 	options.validation = validation;
@@ -2548,7 +2554,7 @@ function openFormDlg(fields, title, options, validation) {
 	
 	let get_field_value = f => {
 		
-		if (f.nodata) return undefined;
+		if (!f || f.nodata) return undefined;
 		
 		let r, value = null;
 		
@@ -2562,13 +2568,49 @@ function openFormDlg(fields, title, options, validation) {
 		return value;
 	}
 	
+	
+	
+	if (has_field_visibility) {
+		var fields_map = fields.reduce((m, f) => (m[f.id] = f, m), {});
+		
+		var field_visible = f => {
+			if (!f.visibility) return true; 
+			
+			let expr = f.visibility.replace(/\$([a-z_]\w*)\b/gi, (m0, fname) => {
+				if (fname == f.id) return "true";
+				
+				let vf = fields_map[fname];
+				if (vf.visibility) {
+					if (new RegExp(`\\$${f.id}\\b`).exec(vf.visibility)) return "true";
+					if (!field_visible(vf)) return "false";
+				}
+				
+				let v = get_field_value(vf);
+				return v == undefined ? 'NULL' : v;
+			});
+			
+			return solve(expr);
+		};
+		
+		let f_visibilities = fields.filter(f => f.visibility);
+		let change_event_handler = e => {
+			for (let f of f_visibilities) $(f.elem).closest('.form-field').css('display', field_visible(f) ? '' : 'none' );
+		};
+		
+		$(dlg).find('input,select').on('change', change_event_handler);		
+		change_event_handler();
+	}
+	
+	
 	let fields_to_object =  empty => {
 		if (empty && options.alwaysResolve && options.nullable) return null;
 		
 		var value, result = {};
 		for (let f of fields) {
 			if (f.nodata) continue;
-			value = empty ? null : get_field_value(f);
+			
+			if (has_field_visibility && !field_visible(f)) value = null;
+			else value = empty ? null : get_field_value(f);
 			
 			if (f.group) {
 				if (!result[f.group]) result[f.group] = {};
@@ -2578,6 +2620,7 @@ function openFormDlg(fields, title, options, validation) {
 		
 		return result;
 	};
+	
 	
 	if (options.validation || has_field_validation) {
 		let form_validation = options.validation;
@@ -3303,7 +3346,18 @@ function solve(expr, undef, vars = null, unescape = true) {
 		
 		if (undef && undef.test(expr)) return undefined;
 		return "";
-	};
+	}
+	
+	if (vars && (s = expr.match(/^\s*\$(_*?[a-z][\w_]*)\s*=\s*(\(?.*\)?)\s*(?=(?<=\))\s*(?:&&|\|\||))/i))) {
+	
+		value = solve(s[2], undef, vars, unescape);
+		
+		if (value === undefined) return undefined;
+		vars[s[1]] = value;
+		if (Array.isArray(value)) return value = value.length;
+		
+		expr = " " + value + " " + expr.slice(s[0].length);
+	}
 	
 	while ((s = expr.match(/^\s*(!)?\s*\(((?:[^()]*|\((?:[^()]*|\([^()]*\))*\))*)\)|^(.*?)\s(\|\||&&)\s/i)) && !(undef && undef.test(s[3]))) {
 		if (s[3] != undefined) {

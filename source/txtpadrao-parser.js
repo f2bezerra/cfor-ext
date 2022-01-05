@@ -20,7 +20,7 @@ var editor, alt_editor, html, tipo_doc;
 $("#frmEditor [name^='txaEditor_']").each((i, ed) => {
 	if (editor) return false;
 	html = $(ed).val();
-	if (html.match(/<p[^>]*>%INIT\([\w\W]*?\)%(?:%FIELDS\([\w\W]*?\)%)?(?:%REFS\([\w\W]*?\)%)?<\/p>/i)) editor = ed;
+	if (html.match(/<p[^>]*>%INIT\([\w\W]*?\)%[\w\W]*?<\/p>/i)) editor = ed;
 	if (!editor && html.match(/@tratamento_destinatario@|o\s*gerente\s*regional\s*da\s*anatel(?:<\/[^>]*?>)?\s*,/i)) alt_editor = ed;
 	if (i == 1 && html.match(/\bAto\s+n[^\s]+\s+\d+/i)) tipo_doc = "ato";
 });
@@ -34,10 +34,13 @@ if (!editor) {
 //Executar automação do documento
 if (editor) {
 	html = $(editor).val();
-	var m, esp_proc, desc_servico, ind_servico, cod_servico, sigla_servico, cpfj_dest, cpfj_int, fields, references, usu_sei_ok;
-	
-	//---inicialização das variáveis internas ===> %INIT(@tipo_processo@;@especificacao_processo@;@cpf_interessado@;@cnpj_interessado@;@cpf_destinatario@;@cnpj_destinatario@)%
-	html = html.replace(/<p[^>]*>%INIT\(([^,]*?),(.*?),\s*([\d\.\-]+|@[\w_]+@|)\s*,\s*([\d\.\-\/]+|@[\w_]+@|)\s*,\s*([\d\.\-]+|@[\w_]+@|)\s*,\s*([\d\.\-\/]+|@[\w_]+@|)\s*\)%(?:%FIELDS\(([\w\W]*?)\)%)?(?:%REFS\(([\w\W]*?)\)%)?<\/p>/i, (m0, m1, m2, m3, m4, m5, m6, m7, m8) => {
+
+	//--- INICIALIZAÇÃO DAS VARIÁVEIS INTERNAS
+
+	var m, esp_proc, desc_servico, ind_servico, cod_servico, sigla_servico, cpfj_dest, cpfj_int, fields, references, inputs, usu_sei_ok;
+	let regex = /<p[^>]*>%INIT\(([^,]*?),(.*?),\s*([\d\.\-]+|@[\w_]+@|)\s*,\s*([\d\.\-\/]+|@[\w_]+@|)\s*,\s*([\d\.\-]+|@[\w_]+@|)\s*,\s*([\d\.\-\/]+|@[\w_]+@|)\s*\)%(?:%FIELDS\(([\w\W]*?)\)%)?(?:%REFS\(([\w\W]*?)\)%)?(?:%INPUTS\(([\w\W]*)\)%)?<\/p>/i;
+
+	html = html.replace(regex, (m0, m1, m2, m3, m4, m5, m6, m7, m8, m9) => {
 		var set_servico = function(cod) {
 			cod_servico = ("000" + cod).slice(-3); 
 			switch (parseInt(cod)) {
@@ -135,202 +138,179 @@ if (editor) {
 		
 		if (m7) fields = fieldsFromString($area.html(m7).text());
 		if (m8) references = referencesFromString($area.html(m8).text());
+		if (m9) inputs = $area.html(m9).text().replace(/(?<=[{,:]\s*)[a-z_]\w*(?=\s*:)/ig, '"$&"');
 		
 		if (!cpfj_int && (c = findFieldValue(fields, "cpf", "num") || findFieldValue(fields, "cnpj", "num")) && validateCpfj(c)) cpfj_int = c;
 
 		return "";
 	});
-
-	//Função de escrita de texto destacado
-	var HLText = (text, color="red") => `<span style="background-color:${color};">${text}</span>`;
-
-	//--- INTERPRETAÇÃO DOS CAMPOS
-
-	//intepretar campos %desc_servico%, %ind_servico%, %cod_servico% e %sigla_servico%
-	html = html.replace(/%(desc|ind|cod|sigla)_servico(?:@([^%]+))?%/ig, (m0, prefix, format) => {
-		var value;
-		switch (prefix.toLowerCase()) {
-			case "desc": value = desc_servico == undefined?HLText("*** Serviço Desconhecido ***"):desc_servico; break;
-			case "ind": value = ind_servico == undefined?HLText("*** Desconhecido ***"):ind_servico; break;
-			case "cod": value = cod_servico == undefined?'000':cod_servico; break;
-			case "sigla": value = sigla_servico == undefined?'':sigla_servico; break;
-		}
-		
-		return formatValue(value, format);
-	});
 	
-	//função interna para determinar se é pessoa física ou jurídica
-	let is_pfj = c => {
+	
+	
+	//--- VARIÁVEIS DEFINIDAS PELO USUÁRIO
+	
+	var uservars = {hoje: (new Date()).toDateBR()};
+	if (fields) fields.forEach(f => uservars[identityNormalize(f.name)] = f.value);
+	
+	
+	
+	//--- FUNÇÕES GERAIS
+	
+	//escrver texto destacado
+	var HLText = (text, color) => color?`<span style="background-color:${color};">${text}</span>`:text;
+
+	//determinar se código numérico é de pessoa física ou jurídica
+	var is_pfj = c => {
 		if (!c) return false;
 		c = c.replace(/\D/g, "");
 		return c.length == 11 ? "f" : c.length == 14 ? "j" : undefined;
 	}
-
-	//interpretar campos %desc_cpfj_int%, %cpfj_int%, %desc_cpfj_dest%, %cpfj_dest%
-	html = html.replace(/%(desc_)?cpfj_(int|dest)(?:@?(\*))?%/ig, (m0, prefix, sufix, format = "") => {
-		let value;
-		
-		if (sufix.toLowerCase() == "int") {
-			if (!cpfj_int) return HLText("*** CPF/CNPJ do Interessado Desconhecido ***");
-			value = cpfj_int;
-		} else {
-			if (!cpfj_dest) return HLText("*** CPF/CNPJ do Destinatário é Desconhecido ***");
-			value = cpfj_dest;
-		}
-		
-		value = format.includes("num")?value.replace(/\D/g,""):value;
-		
-		if (is_pfj(cpfj_int) == "f") {
-			if (format.includes("*")) value = "***" + value.slice(3,-2) + "**"
-			if (prefix) value = "CPF nº " + value;
-		} else {
-			if (prefix) value = "CNPJ nº " + value;
-		}
-		if (format.includes("low")) value = value.toLowerCase();
-		
-		return value;
-	});
-
-	//interpretar campos %is_int_pf%, %is_int_pj%, %is_dest_pf% e %is_dest_pj%
-	html = html.replace(/%is_(dest|int)_p(f|j)%/ig, (m0, m1, m2) => {
-		if (m1.toLowerCase() == "dest") {
-			if (m2.toLowerCase() == "f") return is_pfj(cpfj_dest) == "f" ? "1" : "0";
-			else return is_pfj(cpfj_dest) == "j" ? "1" : "0";
-		} else {
-			if (m2.toLowerCase() == "f") return is_pfj(cpfj_int) == "f" ? "1" : "0";
-			else return is_pfj(cpfj_int) == "j" ? "1" : "0";
-		}
-	});
-
-	//interpretar campos %is_sarc%
-	html = html.replace(/%is_sarc%/ig, (m0) => {
-		var n = cod_servico == undefined ? 0 : parseInt(cod_servico);
-		return !n ? HLText("???") : n > 250 && n < 256 ? "1" : "0";
-	});
 	
-	//interpretar campos %usu_sei_ok%
-	html = html.replace(/%usu_sei_ok%/ig, (m0) => {
-		if (usu_sei_ok == undefined) usu_sei_ok = getCurrentUsuarioExterno(fields)?"1":"0";
-		return usu_sei_ok;
-	});
-	
-	
-	//---Variáveis definidas pelo usuário
-	var uservars = {hoje: (new Date()).toDateBR()};
-	if (fields) fields.forEach(f => uservars[identityNormalize(f.name)] = f.value);
-	
-	//---Função para substituição das variáveis definidas pelo usuário
-	var replace_uservars = html => {
+	//substituir as variáveis definidas pelo usuário
+	var replace_uservars = (html, empty = true) => {
 		if (!html) return html;
 		return html.replace(/(?:\$(_*?[a-z][\w_]*)(?:@(-?\d+(?:,-?\d+)?|[\w\*]+))?)(?!\w*\s*=)/ig, (m0, name, format) => {
-			if (!uservars.hasOwnProperty(name)) return "";
+			if (!uservars.hasOwnProperty(name)) return empty ? "" : "$" + name;
 			return formatValue(uservars[name], format);
 		});
 	}
+	
 
-	//--- INTERPRETAÇÃO DAS FUNÇÕES
-	
-	//interpretar funções %ep_has(expr)%
-	html = html.replace(/%ep_has\(\s*([^)]+)\s*\)%/ig, (m0, expr) => {
-		expr = expr.replace(/\*/g, ".*").replace(/\?/g, ".").replace(/\"/g, "\b").replace(/&nbsp;/g, " ").replace(/<(\w+)[^>]*>(.+)<\/\1>/gi, "$2");
-		
-		return (new RegExp(expr, "i")).test(esp_proc) ? "1" : "0";
-	});
-	
-	//interpretar funções %field(name, format, default)%
-	html = html.replace(/%field\(\s*([^;)@]+)(?:\s*@([^;)]+))?\s*(?:;\s*([^)]+)\s*)?\)%/ig, (m0, name, format, _default) => {
-		_default = _default && _default.replace(/<\/?\w+[^>]*?>/g,"");
-		return (f = findFieldValue(fields, name, 0.9, format)) ? f : _default ? replace_uservars(_default) : "";
-	});
-	
-	//interpretar funções %ref(name, format, default)%
-	html = html.replace(/%ref\(\s*([^;@)]+)(?:@([^;)]+))?(?:\s*;\s*([^)]*)\s*)\)%/ig, (m0, name, format, _default) => {
-		if (!references) return "";
-		
-		let ref_name = identityNormalize(name);
-		let value = references[ref_name];
-		
-		_default = _default && _default.replace(/<\/?\w+[^>]*?>/g,"");
-		
-		if (format && value) {
-			format = format.toLowerCase().trim();
-			switch (name) {
-				case "sei": 
-					if (format == "link") value = `<span data-cke-linksei="1" style="text-indent:0px;" contenteditable="false"><a id="lnkSei${references.protocolo}" class="ancoraSei" style="text-indent:0px;">${value}</a></span>`;
-					break;
 
-				case "ano":
-					if (format == "2") value = (value.length == 4) ? value.slice(-2) : value.substr(0,2);
-					else if (format == "4") value = (value.length == 4) ? value : (Number(value.slice(-2))<50?"20":"19") + value.slice(-2);
-					break;
-				
-				case "data":
-					if (format == "ext" && (md = value.match(/(\d{2})\/(\d{2})\/(\d{4})/))) {
-						let mes = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
-						value = `${Number(md[1])} de ${mes[Number(md[2])-1]} de ${md[3]}`;
-					}
-					break;
-					
-				default:
-					value = formatValue(value, format);				
+	//--- INTERPRETAÇÃO DOS CAMPOS E FUNÇÕES DO CFOR
+	
+	// interpretar HTML
+	var parse_html = (html, options = {hlColor: "red", emptyVar: true}) => {
+		
+		//escapar caracters
+		html = html.replace(/&#(\d+);/g, (m0, code) => {
+			return String.fromCharCode(parseInt(code));
+		});	
+		
+		//%desc_servico%, %ind_servico%, %cod_servico% e %sigla_servico%
+		html = html.replace(/%(desc|ind|cod|sigla)_servico(?:@([^%]+))?%/ig, (m0, prefix, format) => {
+			var value;
+			switch (prefix.toLowerCase()) {
+				case "desc": value = desc_servico == undefined?HLText("*** Serviço Desconhecido ***", options.hlColor):desc_servico; break;
+				case "ind": value = ind_servico == undefined?HLText("*** Desconhecido ***", options.hlColor):ind_servico; break;
+				case "cod": value = cod_servico == undefined?'000':cod_servico; break;
+				case "sigla": value = sigla_servico == undefined?'':sigla_servico; break;
 			}
-		}
+			
+			return formatValue(value, format);
+		});
 		
-		return value ? value : _default ? replace_uservars(_default) : "";
-	});
+		//%desc_cpfj_int%, %cpfj_int%, %desc_cpfj_dest%, %cpfj_dest%
+		html = html.replace(/%(desc_)?cpfj_(int|dest)(?:@?(\*))?%/ig, (m0, prefix, sufix, format = "") => {
+			let value;
+			
+			if (sufix.toLowerCase() == "int") {
+				if (!cpfj_int) return HLText("*** CPF/CNPJ do Interessado Desconhecido ***", options.hlColor);
+				value = cpfj_int;
+			} else {
+				if (!cpfj_dest) return HLText("*** CPF/CNPJ do Destinatário é Desconhecido ***", options.hlColor);
+				value = cpfj_dest;
+			}
+			
+			value = format.includes("num")?value.replace(/\D/g,""):value;
+			
+			if (is_pfj(cpfj_int) == "f") {
+				if (format.includes("*")) value = "***" + value.slice(3,-2) + "**"
+				if (prefix) value = "CPF nº " + value;
+			} else {
+				if (prefix) value = "CNPJ nº " + value;
+			}
+			if (format.includes("low")) value = value.toLowerCase();
+			
+			return value;
+		});
+		
+		//%is_int_pf%, %is_int_pj%, %is_dest_pf% e %is_dest_pj%
+		html = html.replace(/%is_(dest|int)_p(f|j)%/ig, (m0, m1, m2) => {
+			if (m1.toLowerCase() == "dest") {
+				if (m2.toLowerCase() == "f") return is_pfj(cpfj_dest) == "f" ? "1" : "0";
+				else return is_pfj(cpfj_dest) == "j" ? "1" : "0";
+			} else {
+				if (m2.toLowerCase() == "f") return is_pfj(cpfj_int) == "f" ? "1" : "0";
+				else return is_pfj(cpfj_int) == "j" ? "1" : "0";
+			}
+		});
+		
+		//%is_sarc%
+		html = html.replace(/%is_sarc%/ig, (m0) => {
+			var n = cod_servico == undefined ? 0 : parseInt(cod_servico);
+			return n > 250 && n < 256 ? "1" : "0";
+		});
+		
+		//%usu_sei_ok%
+		html = html.replace(/%usu_sei_ok%/ig, (m0) => {
+			if (usu_sei_ok == undefined) usu_sei_ok = getCurrentUsuarioExterno(fields) ? "1" : "0";
+			return usu_sei_ok;
+		});
+		
+		//%ep_has(expr)%
+		html = html.replace(/%ep_has\(\s*([^)]+)\s*\)%/ig, (m0, expr) => {
+			expr = expr.replace(/\*/g, ".*").replace(/\?/g, ".").replace(/\"/g, "\b").replace(/&nbsp;/g, " ").replace(/<(\w+)[^>]*>(.+)<\/\1>/gi, "$2");
+			
+			return (new RegExp(expr, "i")).test(esp_proc) ? "1" : "0";
+		});
+		
+		//%field(name, format, default)%
+		html = html.replace(/%field\(\s*([^;)@]+)(?:\s*@([^;)]+))?\s*(?:;\s*([^)]+)\s*)?\)%/ig, (m0, name, format, _default) => {
+			_default = _default && _default.replace(/<\/?\w+[^>]*?>/g,"");
+			return (f = findFieldValue(fields, name, 0.9, format)) ? f : _default ? replace_uservars(_default) : "";
+		});
+		
+		//%ref(name, format, default)%
+		html = html.replace(/%ref\(\s*([^;@)]+)(?:@([^;)]+))?(?:\s*;\s*([^)]*)\s*)\)%/ig, (m0, name, format, _default) => {
+			if (!references) return "";
+			
+			let ref_name = identityNormalize(name);
+			let value = references[ref_name];
+			
+			_default = _default && _default.replace(/<\/?\w+[^>]*?>/g,"");
+			
+			if (format && value) {
+				format = format.toLowerCase().trim();
+				switch (name) {
+					case "sei": 
+						if (format == "link") value = `<span data-cke-linksei="1" style="text-indent:0px;" contenteditable="false"><a id="lnkSei${references.protocolo}" class="ancoraSei" style="text-indent:0px;">${value}</a></span>`;
+						break;
 
-	//substituir atributos bookmark por bm
-	html = html.replace(/\bbookmark\s*?(=\s*?\\?["'][^"']*?\\?["'])/ig, (m0,m1) => {
-		return "bm" + m1;
-	});
-	
-	//interpretar funções %bm(name)%
-	html = html.replace(/%bm\(\s*([^)]+)\s*\)%/ig, (m0, name) => {
-		if (!references || !references.bookmarks) return "";
-		name = identityNormalize(name);
-		let value = references.bookmarks[bm_name];
-		return value ? value : "";
-	});
-	
-	
-	//--- OUTROS TRATAMENTOS
-	
-	//tratar escapes de caracters
-	html = html.replace(/&#(\d+);/g, (m0, code) => {
-		return String.fromCharCode(parseInt(code));
-	});	
-	
-	//incluir forma de tratamento de destinatário quando não definido
-	html = html.replace(/@tratamento_destinatario@/gi, (m0) => {
-		if (is_pfj(cpfj_dest) == "f") return HLText("Ao(À) Senhor(a)");
-		return HLText("Ao(À) Senhor(a) Representante Legal de");
-	});
-	
-	//apagar complemento de endereço quando não definido
-	html = html.replace(/\s*(?:<(\w+)\b[^>]*?>)?\s*[,-]?(?:\s|&nbsp;)*@complemento_endereco_destinatario@\s*(?:.*?<\/\1>)?/gi, (m0) => {
-		return "";
-	});
-	
-	//corrigir automaticamente denominação do cargo de gerência
-	html = html.replace(/O GERENTE REGIONAL DA ANATEL\s*(?=(?:<\/[^>]+>)?\s*,)/g, (m0) => {
-		return HLText("O GERENTE REGIONAL DA ANATEL NO ESTADO DO RIO GRANDE DO SUL", "yellow");
-	});
-	
-	//inserir Portaria 889 (Delegação) nos atos quando não existir
-	if (tipo_doc == "ato" && !html.match(/\bPortaria\s*?n\.?(?:\s|&\w+;)*?889\b/i)) {
-		let portaria = HLText(`CONSIDERANDO o disposto na <a data-cke-saved-href="http://www.anatel.gov.br/legislacao/portarias-de-delegacao/645-portaria-889" href="http://www.anatel.gov.br/legislacao/portarias-de-delegacao/645-portaria-889" target="_blank">
-		Portaria n.º&nbsp;889, de 07 de novembro de 2013</a>, que delega competências às Gerências Regionais para aprovação, expedição, adaptação, prorrogação e extinção, exceto por caducidade, de autorização para exploração de serviços de telecomunicações, e de uso de radiofrequências decorrentes, em regime privado de interesse restrito;`, "yellow");
+					case "ano":
+						if (format == "2") value = (value.length == 4) ? value.slice(-2) : value.substr(0,2);
+						else if (format == "4") value = (value.length == 4) ? value : (Number(value.slice(-2))<50?"20":"19") + value.slice(-2);
+						break;
+					
+					case "data":
+						if (format == "ext" && (md = value.match(/(\d{2})\/(\d{2})\/(\d{4})/))) {
+							let mes = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+							value = `${Number(md[1])} de ${mes[Number(md[2])-1]} de ${md[3]}`;
+						}
+						break;
+						
+					default:
+						value = formatValue(value, format);				
+				}
+			}
+			
+			return value ? value : _default ? replace_uservars(_default) : "";
+		});
 		
-		html = html.replace(/[\w\W]*?(<p[^>]*?>)(?=(?:\s*?<\w[^>]*?>)?\s*?CONSIDERANDO)/i, `$&${portaria}</p>$1`);
-	}
+		//%bm(name)%
+		html = html.replace(/%bm\(\s*([^)]+)\s*\)%/ig, (m0, name) => {
+			if (!references || !references.bookmarks) return "";
+			name = identityNormalize(name);
+			let value = references.bookmarks[bm_name];
+			return value ? value : "";
+		});
+		
+		return html;
+	};
 	
-	//--- FUNÇÕES DE AUTOMATIZAÇÃO
-	
-	//---Função para aplicação dos testes de condicionamento
+	//--- aplicar testes #if
 	var apply_conditions = (html, defer_vars) => {
 		
-		//correção da expressão regular que define resultado indefinido
-		//let regex_undef = defer_vars ? /%\w+\(.*\)%|\$\w[\w_]*\b/i : /%\w+\(.*\)%/i;
 		let regex_undef = defer_vars ? /%\w+\(.+|\$\w[\w_]*\b/i : /%\w+\(.+/i;
 		let block_regex =  /(<p[^>]*?><code[^>]*?>{#if\s*([^}]*?)}<\/code><\/p>([\w\W]*?)?)(<p[^>]*?><code[^>]*?>{#if\s*[^}]*?}<\/code><\/p>[\w\W]*?)?(?:<p[^>]*?><code[^>]*?>{#else}<\/code><\/p>([\w\W]*?))?<p[^>]*?><code[^>]*?>{#endif}<\/code><\/p>/ig;
 		let inline_regex = /(<code[^>]*?>{#if\s*([^}]*?)}<\/code>(?!<\/p>)([\w\W]*?)?)(<code[^>]*?>{#if\s*[^}]*?}<\/code>[\w\W]*?)?(?:<code[^>]*?>{#else}<\/code>([\w\W]*?))?<code[^>]*?>{#endif}<\/code>/ig;
@@ -370,13 +350,65 @@ if (editor) {
 		
 		return html;
 	};
-
+	
+	
+	//--- INÍCIO DA INTERPRETAÇÃO DO TEXTO PADRÃO
+	
+	//substituir campos e funções CFOR
+	html = parse_html(html);
+	
+	//incluir forma de tratamento de destinatário quando não definido
+	html = html.replace(/@tratamento_destinatario@/gi, (m0) => {
+		if (is_pfj(cpfj_dest) == "f") return HLText("Ao(À) Senhor(a)");
+		return HLText("Ao(À) Senhor(a) Representante Legal de");
+	});
+	
+	//apagar complemento de endereço quando não definido
+	html = html.replace(/\s*(?:<(\w+)\b[^>]*?>)?\s*[,-]?(?:\s|&nbsp;)*@complemento_endereco_destinatario@\s*(?:.*?<\/\1>)?/gi, (m0) => {
+		return "";
+	});
+	
+	//corrigir automaticamente denominação do cargo de gerência
+	html = html.replace(/O GERENTE REGIONAL DA ANATEL\s*(?=(?:<\/[^>]+>)?\s*,)/g, (m0) => {
+		return HLText("O GERENTE REGIONAL DA ANATEL NO ESTADO DO RIO GRANDE DO SUL", "yellow");
+	});
+	
+	//inserir Portaria 889 (Delegação) nos atos quando não existir
+	if (tipo_doc == "ato" && !html.match(/\bPortaria\s*?n\.?(?:\s|&\w+;)*?889\b/i)) {
+		let portaria = HLText(`CONSIDERANDO o disposto na <a data-cke-saved-href="http://www.anatel.gov.br/legislacao/portarias-de-delegacao/645-portaria-889" href="http://www.anatel.gov.br/legislacao/portarias-de-delegacao/645-portaria-889" target="_blank">
+		Portaria n.º&nbsp;889, de 07 de novembro de 2013</a>, que delega competências às Gerências Regionais para aprovação, expedição, adaptação, prorrogação e extinção, exceto por caducidade, de autorização para exploração de serviços de telecomunicações, e de uso de radiofrequências decorrentes, em regime privado de interesse restrito;`, "yellow");
+		
+		html = html.replace(/[\w\W]*?(<p[^>]*?>)(?=(?:\s*?<\w[^>]*?>)?\s*?CONSIDERANDO)/i, `$&${portaria}</p>$1`);
+	}
 	
 	//aplicar condições com exceção das funções e variáveis diferidas
 	html = apply_conditions(html, true);
 
 	//montar lista de variáveis a serem fornecidas pelo usuário
 	var vars = undefined;
+	
+	if (inputs) {
+		try {
+			inputs = parse_html(inputs, {hlColor: null, emptyVar: false});
+			inputs = replace_uservars(inputs, false);
+			
+			inputs = JSON.parse(inputs);
+			
+			if (Array.isArray(inputs)) {
+				vars = {};
+				for(let input of inputs) {
+					let type = input.type == 'choice' ? 'select' : (input.type == 'calendar' ? 'date' : input.type);
+					let list = input.type == 'choice' ? input.options : undefined;
+					vars[input.name] = {id: input.name, type: type, label: input.label, value: input.value, items: list, visibility: input.visibility};
+				}
+			}
+			
+		} catch(ex) {
+			vars = undefined;
+		}
+	}
+	
+	//%var()%
 	html = html.replace(/%var\(([^;)%]+);(text|check|calendar|choice(?:&\w+;|[^;])*?);((?:&\w+;|[^;])+)(?:;(.*?))?\)%/gi, (m0, name, type, label, _default) => {
 		if (!vars) vars = {};
 		let var_id = identityNormalize(name.replace(/@.+/, ""));
@@ -405,8 +437,8 @@ if (editor) {
 	});
 	
  	(async function(html) {
-		//executar operações diferidas primeiro
 		
+		//executar operações diferidas primeiro
  		if (!html || !html.match(/%(?:var|extrato)\(.*\)%/i)) return html;
 		
 	 	if (vars) {
@@ -418,12 +450,19 @@ if (editor) {
 			
 			for (let v in data) {
 				if (data.hasOwnProperty(v)) {
-					html = html.replace(new RegExp(`%var\\(${v}(?:@(-?\\d+,?\\d*?))?(?:;([^)]+))?\\)%`, "ig"), (m0, m1, m2) => {
-						return data[v] ? formatValue(data[v], m1) : typeof data[v] == "boolean" ? data[v] : m2 ? m2 : "";
+					html = html.replace(new RegExp(`%var\\(${v}(?:@(-?\\d+,?\\d*?))?(?:;([^)]+))?\\)%`, "ig"), (m0, format, _default) => {
+						return data[v] ? formatValue(data[v], format) : (typeof data[v] == "boolean" ? data[v] : (_default ? _default : ""));
 					});
+					
+					html = html.replace(new RegExp(`\\$${v}(?:@(-?\d+(?:,-?\d+)?|[\w\*]+))?(?!\w*\s*=)`, "ig"), (m0, format) => {
+						return data[v] ? formatValue(data[v], format) : (typeof data[v] == "boolean" ? data[v] : "");
+					});					
+					
 					uservars[v]= data[v];
 				} 
 			}
+			
+			html = replace_uservars(html);
 		} 
 		
 		html = html.replace(/%var\([^;]*?(?:;(.*))?\)%/ig, (m0, m1) => (m1?m1:""));
@@ -431,13 +470,12 @@ if (editor) {
 		//aplicar condições com exceção das funções e variáveis diferidas
 		html = apply_conditions(html, true);
 		
-		
 		//executar funções extrato
 		let extratos = null;
 		html = html.replace(/%extrato\(\s*([^;\)]+)\s*(?:;\s*(\w)\s*(?:;(.*))?)?\)%/ig, (m0, fistel, status, filtro) => {
 			fistel = replace_uservars(fistel).replace(/[^\d,]/g, "");
 			filtro = replace_uservars(filtro);
-			
+
 			if (!fistel.match(/^\d{11}(?:,\d{11})*$/)) return "";
 			
 			let id = "extrato_" + Math.floor((Math.random() * 100000));
