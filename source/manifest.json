@@ -1,7 +1,7 @@
 {
 	"manifest_version": 2,
 	"name": "cfor-ext",
-	"version": "3.5.0",
+	"version": "3.6.0",
 	"author": "Fabio Fernandes Bezerra",
 	"description": "Extensão de funcionalidades do SEI",
 	

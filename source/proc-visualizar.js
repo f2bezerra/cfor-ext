@@ -15,8 +15,6 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 	
 	$.get(url, function(data) {
 		
-		console.log("Leitura Processo OK");
-		
 		let $html = $(data);
 		let m_tipo; 
 		var processo = {};
@@ -31,9 +29,11 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 		
 		processo.tipo = null;
 		if (tipo_processo.match(/cassação/i)) processo.tipo = "CS";
+		else if (tipo_processo.match(/\bplano\b.*básico\b.*:/i)) processo.tipo = "PB";
 		else if (tipo_processo.match(/\bradiodifusão\b.*?:/i)) processo.tipo = "RD";
 		else if (tipo_processo.match(/\s*pessoal\s*:/i)) processo.tipo = "PS";
-		else if (tipo_processo.match(/\s*autorização\b.*?radiofrequência\s*/i)) processo.tipo = "RF";
+		else if (tipo_processo.match(/\s*autorização\b.*?radiofreq.*/i)) processo.tipo = "RF";
+		else if (tipo_processo.match(/\s*interesse\b.*?coletivo\s*/i)) processo.tipo = "SIR";
 		else if (processo.servico) processo.tipo = processo.servico.tipo;
 		
 		

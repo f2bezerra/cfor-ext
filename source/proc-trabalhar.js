@@ -188,16 +188,36 @@ document.getElementById("ifrVisualizacao").addEventListener("load", function() {
 
 		let ifrA = document.getElementById("ifrArvore");
 		let docA = ifrA.contentDocument || ifrA.contentWindow.document;
-		let is_rd = false;
-		if (inputTipoProcesso = docA.getElementById("hdnTipoProcesso")) is_rd = ($(inputTipoProcesso).val().toLowerCase() == "RD");
-		
-		if (is_rd) {
-			selAssuntos.add(new Option("280.3 - LICENCIAMENTO DE ESTAÇÕES DE RADIODIFUSÃO", "551"));
-			hdnAssuntos.value = "551±280.3 - LICENCIAMENTO DE ESTAÇÕES DE RADIODIFUSÃO";
-		} else {
-			selAssuntos.add(new Option("203 - INSTRUÇÕES, PROCEDIMENTOS E ROTINAS DE OUTORGA E RECURSOS À PRESTAÇÃO", "472"));
-			hdnAssuntos.value = "472±203 - INSTRUÇÕES, PROCEDIMENTOS E ROTINAS DE OUTORGA E RECURSOS À PRESTAÇÃO";
+		let tipoProcesso = '';
+		if (inputTipoProcesso = docA.getElementById("hdnTipoProcesso")) tipoProcesso = $(inputTipoProcesso).val().toUpperCase();
+
+		switch (tipoProcesso) {
+			case 'RD':
+				selAssuntos.add(new Option("283 - LICENCIAMENTO DE ESTAÇÕES DE RADIODIFUSÃO", "1165"));
+				hdnAssuntos.value = "1165±283 - LICENCIAMENTO DE ESTAÇÕES DE RADIODIFUSÃO";
+				break;
+
+			case 'SIR':
+			case 'CS':
+				selAssuntos.add(new Option("223 - AUTORIZAÇÃO", "1136"));
+				hdnAssuntos.value = "1136±223 - AUTORIZAÇÃO";
+				break;
+			
+			case 'PB':
+				selAssuntos.add(new Option("281 - DISTRIBUIÇÃO DE CANAIS", "1163"));
+				hdnAssuntos.value = "1163±281 - DISTRIBUIÇÃO DE CANAIS";
+				break;
+
+			case 'RF':
+				selAssuntos.add(new Option("271 - AUTORIZAÇÃO DE USO DE RADIOFREQUÊNCIA", "1158"));
+				hdnAssuntos.value = "1158±271 - AUTORIZAÇÃO DE USO DE RADIOFREQUÊNCIA";
+				break;
+
+			default:
+				selAssuntos.add(new Option("274 - LICENCIAMENTO DE ESTAÇÕES DE TELECOMUNICAÇÕES", "1161"));
+				hdnAssuntos.value = "1161±274 - LICENCIAMENTO DE ESTAÇÕES DE TELECOMUNICAÇÕES";
 		}
+		
 	}
 	
 	let fn_autoconf = function() {
