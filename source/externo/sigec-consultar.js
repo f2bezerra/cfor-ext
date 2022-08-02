@@ -18,6 +18,7 @@ $(document).ready(function() {
 	document.head.appendChild(style);
 
 	style.sheet.insertRule('table#tblMenuPopUp {width: max-content!important;}', 0);
+	style.sheet.insertRule('@media print {.drop-content {display: none;}}', 0); 
 	
 	var script = document.createElement('script');
 	script.textContent = `var safe_print = window.print; window.print = function() {window.print = safe_print};`;

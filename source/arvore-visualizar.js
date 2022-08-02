@@ -52,10 +52,9 @@ function addNovo() {
 	
 	let items = [{text: "Externo", items: [
 						{id: "ext-reg", text: "Consulta de Regularidade"}, 
-						/*{id: "ext-sis", text: "Consulta de Sistema"}, */
 						{id: "ext-lic", text: "Licenças Impressas"}, 
 						{id: "ext-coer", text: "COER"}, 
-						{id: "ext-dec", text: "Declaração de Aeronave"}, 
+						{id: "ext-rab", text: "Consulta de RAB"}, 
 						{id: "rel-sis", text: "Relatório de ..."}, 
 						{id: "reg-vis", text: "Registro de Visão"}, 
 						{id: "ext-lan", text: "Extrato de Lançamentos"},
@@ -287,10 +286,10 @@ function addNovo() {
 					predata.upload = true;
 					break;
 					
-				case "ext-dec":
+				case "ext-rab":
 					url = $html.find("[data-desc*=externo] .ancoraOpcao").attr("href");
-					predata.tipo = "Declaração";
-					predata.desc = "de Estação de Aeronave" + (info && info.indicativo ? " " + info.indicativo : "");
+					predata.tipo = "Consulta";
+					predata.desc = "ao RAB" + (info && info.indicativo ? " - " + info.indicativo : "");
 					predata.acesso = "auto";
 					predata.upload = true;
 					break;
@@ -710,7 +709,7 @@ function addFuncoesAnatel(aberto) {
 					}
 					
 					waitMessage("Consultando RA...");
-					consultarUrlServico(302, info.cpf).then(url => browser.runtime.sendMessage({action: "open", url: [url]})).finally(() => waitMessage(null)).catch(error => errorMessage(error, "RA"));
+					consultarurlservico(302, info.cpf).then(url => browser.runtime.sendMessage({action: "open", url: [url]})).finally(() => waitMessage(null)).catch(error => errorMessage(error, "RA"));
 			}
 			break;
 

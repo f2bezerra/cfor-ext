@@ -1,7 +1,7 @@
 {
 	"manifest_version": 2,
 	"name": "cfor-ext",
-	"version": "3.6.0",
+	"version": "3.7.0",
 	"author": "Fabio Fernandes Bezerra",
 	"description": "Extensão de funcionalidades do SEI",
 	
@@ -88,8 +88,12 @@
 
 						{"matches": ["*://*.br/sei/controlador.php?acao=md_utl_analise_cadastrar*"],
 						 "all_frames": true,
-						 "js": ["pgd/pgd-analise-cadastrar.js"]}
-						 
+						 "js": ["pgd/pgd-analise-cadastrar.js"]},
+
+						 {"matches": ["*://*.br/sei/controlador.php?acao=md_utl_revisao_analise_cadastrar*"],
+							"all_frames": true,
+							"js": ["pgd/pgd-revisao-analise-cadastrar.js"]}
+							
 						 ],
 						 
 					 

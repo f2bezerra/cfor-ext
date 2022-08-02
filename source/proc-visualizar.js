@@ -78,58 +78,54 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 		if (!is_editable) return;
 		
 		//updateArvore();
+
+		var atualizarCamposDinamicos = async (fields, servico, cpfj) => {
+			if (f = findField(fields, "usuario_sei", 0.65))  {
+				f.name = "Usuário SEI";
+				
+				if (f.value == "?") {
+					waitMessage("Identificando usuário externo...");
+					f.value = "(Não Identificado)";
+					
+					
+					let url_recibo = await getUrlDocumento("Recibo Eletrônico de Protocolo", true).catch(() => null);
+					if (url_recibo) { //Consultar recibo;
+						let recibo = await getAjaxContent(absoluteUrl(url_recibo));
+						if (recibo) {
+							recibo = $("<div />").html(recibo).html();
+							if (recibo && (mu = recibo.match(/<td\b[^>]*?>\s*Usu[áa]rio\s+Externo[\w\W]*?<td\b[^>]*?>([^<]*?)<\/td>/i))) f.value = mu[1].trim();
+						}
+					} else { //Consultar contato externo
+						
+						let contato = await consultarUsuarioExterno(processo.representante).catch(() => null);
+						if (contato) f.value = (contato.status == "ok") ? contato.nome : "(Pendente)";
+					}
+				} 
+			} 
+
+			if (f = findField(fields, "fistel", 0.65))  {
+				f.name = "Fistel";
+				servico = servico || Number($('#hdnServico').val());
+				cpfj = cpfj || findFieldValue(fields, "cpf", 0.8) || findFieldValue(fields, "cnpj", 0.8) || $('#hdnInteressadoPrincipal').val();
+							
+				if (f.value == "?" && servico && cpfj) {
+					waitMessage("Consultando número de fistel...");
+					let entry = await consultarFistel(cpfj, {servico: servico});
+					if (Array.isArray(entry)) entry = entry.find(e => e.situacao == "Ativa");
+					f.value = entry ? entry.fistel : "(Não Identificado)";
+				} 
+			} 
+		};
+
 		
 		var save_fields = function (fields) {
-			let consultas = new Promise((resolve, reject) => {
-				if (f = findField(fields, "usuario_sei", 0.65))  {
-					f.name = "Usuário SEI";
-					
-					if (f.value == "?") {
-						waitMessage("Identificando usuário externo...");
-						f.value = "(Não Identificado)";
-						
-						return getUrlDocumento("Recibo Eletrônico de Protocolo", true).then(recibo => {
-							//consultar recibo
-							Promise.resolve($.get(absoluteUrl(recibo))).then(data => {
-								data = $("<div />").html(data).html();
-								if (data && (mu = data.match(/<td\b[^>]*?>\s*Usu[áa]rio\s+Externo[\w\W]*?<td\b[^>]*?>([^<]*?)<\/td>/i))) {
-									f.value = mu[1].trim();
-									resolve();
-								} else reject();
-							}).catch(() => {
-								reject();
-							});
-						}).catch(() => {
-							//consultar contato externo
-							consultarUsuarioExterno(processo.representante).then(data => {
-								f.value = (data.status == "ok") ? data.nome : "(Pendente)";
-								resolve();
-							}).catch(() => {
-								reject();
-							});
-						});
-						
-					} else reject();
-				} else reject();
-			});
 			
-			consultas.finally(() => {
-
+			atualizarCamposDinamicos(fields).finally(() => {
 				waitMessage("Atualizando campos...");
 				return updateFormSEI(url, "frmProcedimentoCadastro", "btnSalvar", function(doc) {
 					$(doc).find("#txaObservacoes").val(fieldsToString(fields, true));
 				}).then(() => {
-					/*
-					$(divDt).find('.proc-field').remove();
-					let last_p = $(divDt).find('p:contains("Interessado:"):last').get(0) || $(divDt).find('p:contains("Interessados:"):last').get(0) || $(divDt).find('p:last').get(0);
-					
-					if (fields) fields.forEach((f) => {$(last_p).before($(`<p class="proc-field" field-name="${identityNormalize(f.name)}"><label>${f.name}: </label><span class='actionable'>${f.value}</span></p>`))});
-					applyActionPanel('.proc-field span')
-
-					$(divDt).get(0).removeCommand("icon-refresh");
-					*/
 					refresh_all_panels(fields);
-
 					updateArvore();
 					notify("success", "Campos atualizados");
 				}).catch(e => notify("fail", "Edição de campos falhou\n" + e.message));
@@ -198,43 +194,8 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 		
 		
 		var save_details = (fields, servico, descricao) => {
-			let consultas = new Promise((resolve, reject) => {
-				if (f = findField(fields, "usuario_sei", 0.65))  {
-					f.name = "Usuário SEI";
-					
-					if (f.value == "?") {
-						waitMessage("Identificando usuário externo...");
-						f.value = "(Não Identificado)";
-						
-						return getUrlDocumento("Recibo Eletrônico de Protocolo", true).then(recibo => {
-							//consultar recibo
-							Promise.resolve($.get(absoluteUrl(recibo))).then(data => {
-								data = $("<div />").html(data).html();
-								if (data && (mu = data.match(/<td\b[^>]*?>\s*Usu[áa]rio\s+Externo[\w\W]*?<td\b[^>]*?>([^<]*?)<\/td>/i))) {
-									f.value = mu[1].trim();
-									resolve();
-								} else reject();
-							}).catch(() => {
-								reject();
-							});
-						}).catch(() => {
-							//consultar contato externo
-							consultarUsuarioExterno(processo.representante).then(data => {
-								f.value = (data.status == "ok") ? data.nome : "(Pendente)";
-								resolve();
-							}).catch(() => {
-								reject();
-							});
-						});
-						
-					} else reject();
-				} else reject();
-			});
-			
-			consultas.finally(() => {
 
-				let tipo_changed = false;
-				let desc_changed = false;
+			atualizarCamposDinamicos(fields, servico).finally(() => {
 				
 				waitMessage("Salvando detalhes do processo ...");
 
@@ -252,38 +213,22 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 								$(doc).find('#selTipoProcedimento').val($(opt).val());
 								$(doc).find('#hdnIdTipoProcedimento').val($(opt).val());
 								$(doc).find('#hdnNomeTipoProcedimento').val($(opt).text());
-								tipo_changed = true;
-								
 								if (Number(servico) >= 251 && Number(servico) <= 255) new_desc += " - Serviço: " + servico;
-								desc_changed = true;
 							}
 						} else {
 							if (servico) new_desc += " - Serviço: " + servico;
-							desc_changed = true;
 						}
 						
 						$('#hdnServico').val(servico).attr("text", getDescServico(servico));
 					}
 					$(doc).find("#txtDescricao").val(new_desc);
 					$(doc).find("#txaObservacoes").val(fieldsToString(fields, true));
-				}).then(() => { /*
-					if (desc_changed && (desc = $(divDt).find('p:contains("Descrição:") span').get(0))) $(desc).text(descricao); 
-					if (tipo_changed) {
-						if (serv = $(divDt).find('p:contains("Serviço:") span').get(0)) $(serv).text(servico + " - " + getDescServico(servico)); 
-						if (span = $('#header').find('span[id^=span]').get(0)) $(span).attr("title", getDescTipologia(servico));
-					}
+				}).then(() => {
+					if (desc = $(divDt).find('p:contains("Descrição:") span').get(0)) $(desc).text(descricao); 
+					if (serv = $(divDt).find('p:contains("Serviço:") span').get(0)) $(serv).text(servico + " - " + getDescServico(servico)); 
+					if (span = $('#header').find('span[id^=span]').get(0)) $(span).attr("title", getDescTipologia(servico));
 					
-					$(divDt).find('.proc-field').remove();
-					let last_p = $(divDt).find('p:contains("Interessado:"):last').get(0) || $(divDt).find('p:contains("Interessados:"):last').get(0) || $(divDt).find('p:last').get(0);
-					
-					if (fields) fields.forEach((f) => {$(last_p).before($(`<p class="proc-field" field-name="${identityNormalize(f.name)}"><label>${f.name}: </label><span class='actionable'>${f.value}</span></p>`))});
-					applyActionPanel('.proc-field span')
-
-					$(divDt).get(0).removeCommand("icon-refresh");
-					
-					*/
-					
-					refresh_all_panels(fields, tipo_changed ? servico : undefined, desc_changed ? descricao : undefined);
+					refresh_all_panels(fields, servico, descricao);
 
 					updateArvore();
 					notify("success", "Processo atualizado");

@@ -289,6 +289,54 @@ async function consultarExtrato(fistel, filter) {
 	
 }
 
+//--- Consultar Fistel
+async function consultarFistel(cpfj, filter = null) {
+	
+	if (!cpfj) return raiseErrorPromise("Parâmetros errado");
+	cpfj = cpfj.replace(/\D/g,"");
+	
+	if (!cpfj || !validateCpfj(cpfj)) return raiseErrorPromise("CPF/CNPJ inválido");
+	
+	return getAjaxContent(`http://sistemasnet/sigec/ConsultasGerais/SituacaoCadastral/tela.asp?acao=c&NumCNPJCPF=${cpfj}`, {returnError: true}).then(html => {
+		let $html = $(html);
+		let result = [];
+		
+		let $rows = $html.find('tr[id^=TRplus]');
+		if ($rows.length) {
+			$rows.each((index, row) => {
+				let cols = $(row).children('td');
+				let entry = {nome: $(cols[0]).text().trim(),
+							 fistel: $(cols[1]).find('button').first().text().trim(),
+							 uf: $(cols[3]).find('label').first().text().trim(),
+							 servico: $(cols[4]).text().trim(),
+							 devedor: $(cols[6]).text().trim(),
+							 situacao: $(cols[11]).text().trim(),
+							 validade: $(cols[12]).text().trim()};
+				result.push(entry);
+			});
+			
+			if (filter) {
+				let fn_filter = filter;
+				
+				if (typeof filter === 'object') {
+					fn_filter = function(e) {
+						for (let key of Object.keys(filter)) {
+							if (filter[key] != e[key]) return false;
+						}
+						return true;
+					}; 
+				}
+
+				result = result.filter(fn_filter);
+			}
+			
+		}
+
+		if (result.length == 1) return result[0];
+		return result.length ? result : null;
+	}).catch(raiseErrorPromise);
+	
+}
 
 
 // Consultar endereço de consulta do serviço
@@ -298,8 +346,8 @@ async function consultarUrlServico(servico, cpfj_indicativo) {
 	if (!servico) return Promise.reject("Serviço não identificado");
 	servico = Number(servico);
 	
-		switch (servico) {
-			case 302: url = "http://sistemasnet/scra/Consulta/Tela.asp"; break;
+	switch (servico) {
+		case 302: url = "http://sistemasnet/scra/Consulta/Tela.asp"; break;
 		case 400: url = "http://sistemasnet/scpx/Consulta/Tela.asp"; break;
 		case 507: url = "http://sistemasnet/stel/scma/Consulta/Tela.asp"; break;
 		case 604: url = "http://sistemasnet/stel/scmm/Consulta/Tela.asp"; break;

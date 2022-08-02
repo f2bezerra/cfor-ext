@@ -462,7 +462,7 @@ if (editor) {
 				} 
 			}
 			
-			html = replace_uservars(html);
+			html = replace_uservars(html, false);
 		} 
 		
 		html = html.replace(/%var\([^;]*?(?:;(.*))?\)%/ig, (m0, m1) => (m1?m1:""));

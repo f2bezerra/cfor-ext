@@ -1444,27 +1444,6 @@ function addCommand(id, icon, title, list, callback) {
 }
 
 
-/***** INTEGRAÇÃO COM A SUITE CFOR *****/
-async function addControlePagto(fistel, processo, servico, debitos, nome) {
-	fistel = fistel && fistel.replace(/\D/g,",") && fistel.split(",").filter(item => validateFistel(item)).join(",");
-	processo = processo && processo.replace(/\D/g, "");
-	
-	if (!fistel || !processo) throw "Fistel ou Número de Processo inválido";
-	
-	servico = servico && servico.toString().replace(/\D/g,"").padStart(3,"0");
-	
-	return addCpag(processo, servico, fistel).then(result => console.log("OK: ", result)).catch(err => console.log("ERROR: ", err));
-	
-	/*
-	if (debitos === true) debitos = "t";
-	else if (typeof debitos == "string" && debitos.length) debitos = debitos[0].toLowerCase();
-	else throw "Tipo de débitos inválido"
-	
-	browser.runtime.sendMessage({action: "popup", url: getCforUrl(`cpag/cfor-ext.php?acao=incluir&processo=${processo}&servico=${servico}&fistel=${fistel}&debitos=${debitos}&nome=${nome}`), options: {width: 540, height: 220}});
-	*/
-	return true;
-}
-
 
 /***** ATUALIZAÇÕES DOS PAINÉIS ******/
 //Aplicar ações de painel
@@ -1478,31 +1457,47 @@ function applyActionPanel(items) {
 								 condition: function(e) {return !testFieldNames($(e.currentTarget).closest('.proc-field').attr('field-name'), /\bfistel\b/i) && validateCpfj($(this).text())}, 
 								 callback: async function(e) {
 											   let cpfj = $(this).text().replace(/\D/g,"");
+											   setClipboard(cpfj);
 		
+											   let urls = [`http://sistemasnet/sigec/ConsultasGerais/SituacaoCadastral/tela.asp?acao=c&NumCNPJCPF=${cpfj}&indTipoComparacao=e&hdnImprimir=true`,
+												           `http://sistemasnet/sigec/ConsultasGerais/NadaConsta/certidao.asp?CND=1&ValidaSistema=SIGEC&NumCNPJCPF=${cpfj}&acao=c&cmd`]; 
+
+												if (cpfj.length == 11) {
+													waitMessage("Consultando data de nascimento...");
+													let nasc = await consultarEntidade(cpfj).then(cadastro => cadastro.nascimento).catch(err => null);
+													waitMessage(null);
+
+													nasc = nasc || await openFormDlg([{id: "nasc", type: "date", label: "Data de Nascimento", required: true, value: default_nasc ?? ""}], "Consulta").then(data => data.nasc).catch(err => null);														   
+													
+													if (nasc) urls.push(`https://servicos.receita.fazenda.gov.br/Servicos/CPF/ConsultaSituacao/ConsultaPublica.asp?CPF=${cpfj}&NASCIMENTO=${nasc}`); 
+													else urls.push(`https://servicos.receita.fazenda.gov.br/Servicos/CPF/ConsultaSituacao/ConsultaPublica.asp?CPF=${cpfj}`); 
+													
+												} else {
+													urls.push(`http://www.receita.fazenda.gov.br/PessoaJuridica/CNPJ/cnpjreva/cnpjreva_solicitacao2.asp?CNPJ=${cpfj}`); 
+													// urls.push(`http://servicos.receita.fazenda.gov.br/Servicos/certidao/CndConjuntaInter/InformaNICertidao.asp?Tipo=1&NI=${cpfj}`); 
+													urls.push(`http://www.portaltransparencia.gov.br/sancoes/ceis?paginacaoSimples=true&tamanhoPagina=&offset=&direcaoOrdenacao=asc&colunasSelecionadas=linkDetalhamento%2CcpfCnpj%2Cnome%2CufSancionado%2Corgao%2CtipoSancao%2CdataPublicacao&cpfCnpj=${cpfj}&ordenarPor=nome&direcao=asc`); 
+												}
+												
+											   
+											   browser.runtime.sendMessage({action: "open", url: urls});
+					  				       }
+								},
+
+								{action: "sit", 
+								 icon: "icon-anatel", 
+								 title: "Consultar Situação Anatel", 
+								 condition: function(e) {return !testFieldNames($(e.currentTarget).closest('.proc-field').attr('field-name'), /\bfistel\b/i) && validateCpfj($(this).text())}, 
+								 callback: async function(e) {
+											   let cpfj = $(this).text().replace(/\D/g,"");
 											   setClipboard(cpfj);
 		
 											   let urls = [`http://sistemasnet/sigec/ConsultasGerais/SituacaoCadastral/tela.asp?acao=c&NumCNPJCPF=${cpfj}&indTipoComparacao=e&hdnImprimir=true`];
 											   
-											   if (!e.ctrlKey) {
-												   urls.push(`http://sistemasnet/sigec/ConsultasGerais/NadaConsta/certidao.asp?CND=1&ValidaSistema=SIGEC&NumCNPJCPF=${cpfj}&acao=c&cmd`); 
-
-												   if (cpfj.length == 11) {
-													  let nasc = /*e.altKey && */await openFormDlg([{id: "nasc", type: "date", label: "Data de Nascimento", required: true}], "Consulta").then(data => data.nasc).catch(err => null);														   
-													  
-													  if (nasc) urls.push(`https://servicos.receita.fazenda.gov.br/Servicos/CPF/ConsultaSituacao/ConsultaPublica.asp?CPF=${cpfj}&NASCIMENTO=${nasc}`); 
-													  else urls.push(`https://servicos.receita.fazenda.gov.br/Servicos/CPF/ConsultaSituacao/ConsultaPublica.asp?CPF=${cpfj}`); 
-													   
-												   } else {
-													   urls.push(`http://www.receita.fazenda.gov.br/PessoaJuridica/CNPJ/cnpjreva/cnpjreva_solicitacao2.asp?CNPJ=${cpfj}`); 
-													   //urls.push(`http://servicos.receita.fazenda.gov.br/Servicos/certidao/CndConjuntaInter/InformaNICertidao.asp?Tipo=1&NI=${cpfj}`); 
-													   urls.push(`http://www.portaltransparencia.gov.br/sancoes/ceis?paginacaoSimples=true&tamanhoPagina=&offset=&direcaoOrdenacao=asc&colunasSelecionadas=linkDetalhamento%2CcpfCnpj%2Cnome%2CufSancionado%2Corgao%2CtipoSancao%2CdataPublicacao&cpfCnpj=${cpfj}&ordenarPor=nome&direcao=asc`); 
-												   }
-												   
-											   }
-											   
 											   browser.runtime.sendMessage({action: "open", url: urls});
-										   }},
+					  				       }
+								},
 										   
+
 								{action: "consultar-user-sei", 
 								 icon: "icon-user-sei", 
 								 title: "Consultar Usuário Externo", 
@@ -1554,27 +1549,31 @@ function applyActionPanel(items) {
 										   
 								{action: "consultar-anac", 
 								 icon: "icon-anac", 
-								 title: "Consultar ANAC", 
+								 title: "Consultar RAB ANAC", 
 								 condition: function(e) {return testFieldNames($(e.currentTarget).closest('.proc-field').attr('field-name'), /\bindicativo\b/i) && $('#hdnServico').val() == "507" && $(this).text().match(/\s*P[PRSTU][A-Z]{3}\s*/i)}, 
 								 callback: async function(e) {
 											   let indicativo = $(this).text().trim();
-											   waitMessage("Abrindo sistemas da ANAC...");
 
-											   											   
-											   try {
-													browser.runtime.sendMessage({action: "open", url: "https://sistemas.anac.gov.br/SACI/SIAC/Aeronave/Estacao/Consulta.asp", script: `
-													sessionStorage.predata_siac = JSON.stringify({indicativo: "${indicativo}", timestamp: Date.now()});
-													/*var marca = document.querySelector('input[name=txtMarca]');
-													if (marca) {
-														sessionStorage.removeItem("predata_siac");
-														marca.value = "${indicativo}";
-														var form = document.querySelector('form[name=frmAeronave]');
-														if (form) form.submit();
-													}*/`, runAt: "document_start"});
-												    waitMessage();
-											   } catch(err) {
-												   waitMessage();
-												   errorMessage(err);
+											   if (e.ctrlKey) {											   											   
+													try {
+														waitMessage("Abrindo sistemas da ANAC...");
+														browser.runtime.sendMessage({action: "open", url: "https://sistemas.anac.gov.br/SACI/SIAC/Aeronave/Estacao/Consulta.asp", script: `
+															sessionStorage.predata_siac = JSON.stringify({indicativo: "${indicativo}", timestamp: Date.now()});
+															/*var marca = document.querySelector('input[name=txtMarca]');
+															if (marca) {
+																sessionStorage.removeItem("predata_siac");
+																marca.value = "${indicativo}";
+																var form = document.querySelector('form[name=frmAeronave]');
+																if (form) form.submit();
+															}*/`, runAt: "document_start"});
+
+															waitMessage();
+													} catch(err) {
+														waitMessage();
+														errorMessage(err);
+													}
+												} else {
+											   		browser.runtime.sendMessage({action: "open", url: `https://sistemas.anac.gov.br/aeronaves/cons_rab_print.asp?nf=${indicativo}`});
 											   }
 										   }},
 										   
