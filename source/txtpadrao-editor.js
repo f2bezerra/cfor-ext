@@ -159,6 +159,7 @@ $(function() {
 					variables.push({text: "ref.data", desc: "Data do documento de referência", class: "cfor-li-var-struct"});
 					variables.push({text: "ref.ano", desc: "Ano do documento de referência", class: "cfor-li-var-struct"});
 					variables.push({text: "ref.link", desc: "Link para o documento de referência", class: "cfor-li-var-struct"});
+					variables.push({text: "ref.texto", desc: "Nome completo do documento de referência", class: "cfor-li-var-struct"});
 
 					return variables;
 				}
@@ -175,6 +176,7 @@ $(function() {
 								{text: "num", desc: "Número sequencial do documento", class: "cfor-li-var-prop"},
 								{text: "data", desc: "Data do documento", class: "cfor-li-var-prop"},
 								{text: "ano", desc: "Ano do documento", class: "cfor-li-var-prop"},
+								{text: "texto", desc: "Nome completo do documento", class: "cfor-li-var-prop"},
 								{text: "link", desc: "Link para o documento", class: "cfor-li-var-prop"}];
 					}
 				}

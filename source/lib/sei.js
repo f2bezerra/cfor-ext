@@ -1122,7 +1122,7 @@ function referenceFromData(data) {
 	} 
 
 	if (data instanceof NodeSei) {
-		let fields = {name: "nome", type: "tipo", tipology: "tipologia", sei: "sei", id: "id", extern: "externo", date: "data", bm: "bm", fullName: "nomeCompleto"};
+		let fields = {name: "nome", type: "tipo", tipology: "tipologia", sei: "sei", id: "id", extern: "externo", date: "data", bm: "bm", fullName: "texto"};
 		let result = {};
 		for(let k of Object.keys(fields)) result[fields[k]] = data[k];
 		if (typeof result.data === 'string') result.ano = result.data.slice(-4);

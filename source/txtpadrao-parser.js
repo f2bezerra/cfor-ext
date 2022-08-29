@@ -146,7 +146,7 @@ if (editor) {
 	//substituir as variáveis definidas pelo usuário
 	var replace_uservars = (html, empty = true) => {
 		if (!html) return html;
-		return html.replace(/\$([a-z_]+(?:\.[a-z_]+|\[\w+?\]|\w+)*)(?:@([\w.-]+\b))?(?:\?\?("[^"]+?"|[^<\s]+?(?=[<\s]|$)))?(\s*=(?!=))?/ig, (m0, name, format, _default, attrib) => {
+		return html.replace(/\$([a-z_]+(?:\.[a-z_]+|\[\w+?\]|\w+)*)(?:@([\w.-]+\b))?(?:\?\?("[^"]+?"|&quot;.+?&quot;|[^<\s]+?(?=[<\s]|$)))?(\s*=(?!=))?/ig, (m0, name, format, _default, attrib) => {
 			if (attrib) return m0;
 			let value = name.indexOf('.') != -1 || name.indexOf('[') != -1 ? uservars.getValue(name) : uservars[name];
 			if (!value) return _default ? replace_uservars(_default) : (empty ? "" : "$" + name);
