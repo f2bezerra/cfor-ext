@@ -1,18 +1,24 @@
 ﻿var cache = {};
 
-$('.infraCheckbox').on("change", function(e) {
+$('.infraCheckboxInput').on("change", function(e) {
 	let value = $(this).val();
 	let input = $(this).closest('tr').find(`input[id=numeroSEI_${value}]`).get(0);
+	if (!input) return;
 	
-	if (!input || !e.target.checked) return;
+	if (!e.target.checked) {
+		input.value = "";
+		return;
+	}
 	
 	let doc_tipo = $(input).closest('td').prev().text().trim();
 	
-	console.log("TREE", cache);
-	
-	getDocumentoInfo({last: doc_tipo}, cache).then(data => {
+	queryNodeSei({last: doc_tipo}, cache).then(data => {
 		input.value = data.sei;
 	});
+});
+
+$('#lnkInfraCheck').on('click', (e) => {
+	$('.infraCheckboxInput').trigger('change');
 });
 
 $('#selEncaminhamentoAnl').val(1); //selecionar 'Associar em Fila após finalização do Fluxo'

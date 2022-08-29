@@ -15,6 +15,7 @@ function enableIntellisense(target, options) {
 						   listSeparator: ",",				// separador para listas em string
 						   classItem: undefined,			// classe padrão para itens da lista
 						   sortList: true,					// ordenar lista	
+						   width: undefined,				// largura da lista de intellisense
 						   onSelect: undefined};  			// function({token, value, range})
 						   
 	for (let prop in default_options) if (default_options.hasOwnProperty(prop) && default_options[prop] != undefined && options[prop] == undefined) options[prop] = default_options[prop];
@@ -63,7 +64,7 @@ function enableIntellisense(target, options) {
 		let cn, startOffset, font_height;
 		
 		if (cn = get_current_node()) {
-			startOffset = cn.start;
+			startOffset = target.intellisense.targetIsInput ? cn.start : undefined;
 			target.intellisense.container = cn.target.nodeType==3?cn.target.parentElement:cn.target;
 		} else {
 			let sel = target.intellisense.doc.getSelection();
@@ -117,7 +118,7 @@ function enableIntellisense(target, options) {
 			} else {
 				let key = (options.caseInsensitive?elem.text.toLowerCase():elem.text).trim().normalize('NFD').replace(/[\u0300-\u036f]/g, "");
 				let $li = $(`<li role="presentation" key="${key}" value="${elem.value?elem.value:elem.text}">
-								<a hidefocus="true" href="javascript:void(0);" role="option">
+								<a hidefocus="true" title="${elem.desc ?? ''}" href="javascript:void(0);" role="option">
 									<p>${elem.text}</p>
 								</a>
 							</li>`);
@@ -142,10 +143,10 @@ function enableIntellisense(target, options) {
 			e.stopImmediatePropagation();
 			e.preventDefault();
 			e.stopPropagation();
-			let current_value = $(e.currentTarget).closest('li').attr("value");
+			let current_value = $(e.currentTarget).closest('li').get(0);
 			target.intellisense.close();
 			
-			if (current_value) select_item(current_value);
+			if (current_value) select_item(current_value, e);
 		});		
 		
 		//calcular posição do picker
@@ -157,6 +158,17 @@ function enableIntellisense(target, options) {
 				let sel = target.intellisense.doc.getSelection();
 				let r = sel.getRangeAt(0);
 				let rect = r.getBoundingClientRect();
+
+				if (rect.left == rect.top == rect.width == rect.height) {
+					r = target.intellisense.doc.createRange();
+					let node = sel.focusNode, i = sel.focusOffset;
+					while (node && node.nodeType == 1 && node.childNodes.length) {
+						node = node.childNodes[i];
+						i = 0;	
+					}
+					r.selectNode(node);
+					rect = r.getBoundingClientRect();
+				}
 				let off = $(window.frames[0].frameElement).offset();
 				pos = {top: off.top + rect.top, left: off.left + rect.left + 1};
 			}
@@ -167,7 +179,7 @@ function enableIntellisense(target, options) {
 		};
 		
 		//selecionar item
-		var select_item = function(value) {
+		var select_item = function(item, e) {
 			let i, delim = undefined;
 			if (options.delimiters && options.tokens && token && (i = options.tokens.indexOf(token)) >= 0 && i < options.delimiters.length) {
 				if (Array.isArray(options.delimiters)) delim = options.delimiters[i];
@@ -175,7 +187,7 @@ function enableIntellisense(target, options) {
 			}
 			
 			if (target.intellisense.targetIsInput) {
-				let result = options.onSelect?options.onSelect.call(target, {value: value, token: token, range: {start: (startOffset?startOffset:0), end: target.selectionEnd}}):value;
+				let result = options.onSelect?options.onSelect.call(target, {value: $(item).attr('value'), desc: $(item).find('a').attr('title'), token: token, range: {start: (startOffset?startOffset:0), end: target.selectionEnd}, event: e}):$(item).attr('value');
 				
 				if (result && delim) {
 					result = delim[0] + result;
@@ -200,7 +212,7 @@ function enableIntellisense(target, options) {
 				sel.addRange(range);
 				range.deleteContents();
 				
-				let result = options.onSelect?options.onSelect.call(target, {value: value, token: token, range: range}):value;
+				let result = options.onSelect?options.onSelect.call(target, {value: $(item).attr('value'), desc: $(item).find('a').attr('title'), token: token, range: range, event: e}):$(item).attr('value');
 
 				if (result && delim) {
 					result = delim[0] + result;
@@ -261,13 +273,25 @@ function enableIntellisense(target, options) {
 					e.preventDefault();
 					e.stopPropagation();
 					e.stopImmediatePropagation();
-					let current_value = $(target.intellisense.picker).find("li.intellisense-li-selected").attr("value");
+					let current_value = $(target.intellisense.picker).find("li.intellisense-li-selected").get(0);
 					target.intellisense.close();
-					if (current_value) select_item(current_value);
+					if (current_value) select_item(current_value, e);
 					
 					break;
 				default:
-					if (options.tokens && e.key.length == 1 && options.tokens.includes(e.key)) target.intellisense.close();
+					if (options.tokens && e.key.length == 1 && options.tokens.includes(e.key)) {
+						let cn = get_current_node();
+						if (cn && cn.text) {
+							if (options.tokens.includes(cn.text[0])) cn.text = cn.text.slice(1);
+							if (cn = target.intellisense.picker.querySelector(`li[value=${cn.text}]`)) select_item(cn, e);
+							target.intellisense.close();
+							return;
+						} else target.intellisense.close();
+						
+						e.preventDefault();
+						e.stopPropagation();
+						e.stopImmediatePropagation();
+					}
 			}
 		};
 		
@@ -285,6 +309,11 @@ function enableIntellisense(target, options) {
 			} else {
 				let sel = target.intellisense.doc.getSelection();
 				search_value = $(sel.focusNode).text();
+
+				if (startOffset === undefined) {
+					startOffset = sel.focusOffset - 1;
+					return;
+				}
 					
 				if (startOffset == sel.focusOffset) {
 					target.intellisense.close();
@@ -321,18 +350,22 @@ function enableIntellisense(target, options) {
 		$(target.intellisense.doc).on("mousedown.intellisense_events blur.intellisense_events", target.intellisense.close);
 			
 		if (options.filterList) target.intellisense.filter(options.startChar);
+		if (options.width) $(picker).css("width", options.width);		
 		$(picker).css("display", "block");		
 	};
 
 
 	//--- fechar intellisense
 	target.intellisense.close = function() {
-		$(target.intellisense.picker).css("display", "none");
-		target.intellisense.doc.removeEventListener("keydown", keydown_callback, true);
-		target.intellisense.doc.removeEventListener("input", input_callback, true);
-		$(target.intellisense.doc).off(".intellisense_events");
-		$(target.intellisense.picker).remove();
-		delete target.intellisense.picker;
+		try {
+			$(target.intellisense.picker).css("display", "none");
+			target.intellisense.doc.removeEventListener("keydown", keydown_callback, true);
+			target.intellisense.doc.removeEventListener("input", input_callback, true);
+			$(target.intellisense.doc).off(".intellisense_events");
+			$(target.intellisense.picker).remove();
+		} finally {
+			delete target.intellisense.picker;
+		}
 	};
 	
 	var get_current_node = function() {
@@ -341,7 +374,6 @@ function enableIntellisense(target, options) {
 			let result = {target: target, start: target.selectionStart};
 			let text = $(target).val();
 
-			//if (target.selectionEnd > target.selectionStart) result.text = $(target).val().substr(target.selectionStart, target.selectionEnd);
 			startOffset = target.selectionStart - 1;
 			if (!target.intellisense.regexPrevious) {
 				let re = "\\w";
@@ -349,11 +381,10 @@ function enableIntellisense(target, options) {
 				target.intellisense.regexPrevious = new RegExp("[" + re + "]", "");
 			}
 			let regex = target.intellisense.regexPrevious;
-			//let regex = /[\w]/;
-			while (startOffset > 0 && regex.test(text[startOffset])) startOffset--;
+			while (startOffset >= 0 && regex.test(text[startOffset])) startOffset--;
 			startOffset++;
-			result.text = (target.selectionStart > startOffset)?text.substr(startOffset, target.selectionStart-1):"";
-			
+			result.text = (target.selectionStart > startOffset)?text.substr(startOffset, target.selectionStart):"";
+
 			return result;
 		} else {
 			let sel = target.intellisense.doc.getSelection();
@@ -370,19 +401,18 @@ function enableIntellisense(target, options) {
 			} else {
 				node = sel.focusNode;
 				startOffset = sel.focusOffset;
-				
-				if (node.nodeType == 1 && node.childNodes.length) {
-					if (startOffset == node.childNodes.length) startOffset--;
+
+				while (node.nodeType == 1 && node.childNodes.length) {
+					if (startOffset) startOffset--;
 					node = node.childNodes[startOffset];
-					startOffset = 0;
+					startOffset = node && node.nodeType == 3 ? (node.textContent.length || node.wholeText.length) : node.childNodes.length;
 				}
-				
 			}
-			
 			
 			if (node && node.nodeType == 3) {
 				let n = node;
-				//while ((n = n.previousSibling) && n && n.nodeType == 3) startOffset += n.textContent.length;
+				let text = node.textContent.slice(0, startOffset);
+				while (n = n.previousSibling) text = $(n).text() + text;
 				
 				let result = {target: node, start: startOffset};
 				
@@ -393,9 +423,10 @@ function enableIntellisense(target, options) {
 				}
 				let regex = target.intellisense.regexPrevious;
 				
-				
-				//if ((text = node.wholeText.slice(0, startOffset)) && (m = text.match(/[\w-$]+$/i))) result.text = m[0];
-				if ((text = node.wholeText.slice(0, startOffset)) && (m = text.match(regex))) result.text = m[0];
+				if (m = text.match(regex)) {
+					result.text = m[0];
+					result.start = result.text.length;
+				}
 				
 				return result;
 			}
@@ -406,14 +437,14 @@ function enableIntellisense(target, options) {
 	
 	
 	$(target).on('keypress', function(e) {
-		if (target.intellisense.picker) return;
-		
-		
+
 		if (options.tokens && options.tokens.includes(e.key)) {
+			if (target.intellisense.picker) target.intellisense.close();
+
 			let list = options.list;
 			
 			if (typeof list == "function") {
-				let node, args = {token: e.key};
+				let node, args = {token: e.key, target: target};
 				if (node = get_current_node()) args.previous = node.text;
 				if (!(list = list.call(target, args))) return;
 			}
@@ -423,10 +454,11 @@ function enableIntellisense(target, options) {
 		}
 		
 		if (!options.onlyTokens) {
+			if (target.intellisense.picker) return;
 			let node, search = e.key;
 			if ((node = get_current_node()) && node.text) search = node.text + search;
 			
-			target.intellisense.open(typeof options.list == "function"?options.list.call(target):options.list, search);
+			target.intellisense.open(typeof options.list == "function"?options.list.call(target, {target: target}):options.list, search);
 		}
 		
 		

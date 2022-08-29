@@ -331,7 +331,7 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 								let curr_serv = $('#hdnServico').val();
 								let curr_desc = (desc = $(divDt).find('p:contains("Descrição:") span').get(0)) && $(desc).text().replace(/\(N[aã]o informado\)/i, "");
 								
-								openFormDlg([{id: "servico", type: "select", label: "Serviço", items: "000,001,002,019,251,252,253,254,255,302,400,507,604", value: curr_serv},
+								openFormDlg([{id: "servico", type: "select", label: "Serviço", items: "001,002,019,251,252,253,254,255,302,400,507,604", value: curr_serv},
 											 {id: "descricao", type: "text", label: "Descrição", value: curr_desc, items: "Pedido Inicial,Nova Autorização de RF,Renúncia,Exclusão,Alteração,Autocadastramento,Mudança de Proprietário,Inclusão de Estação"},
 											 {id: "fields", type: "textarea", rows: 7, cols: 50, label: "Campos do processo", value: fieldsToString(fields), intellisense: intellisense_options, autofocus: true}], 
 											 "Detalhes do processo [Salvar]").then(data => save_details(fieldsFromString(data.fields), data.servico, data.descricao));
@@ -342,72 +342,49 @@ if ((html = $('head').html()) && (m = html.match(/controlador\.php\?acao=procedi
 		console.log("Status: ", textStatus, "Error: ", errorThrown);
 	});
 
-	$('body').ready(function() {
-		$('#frmArvore').find('[src*=restrito]').filter('[title*="Pendente An"]').attr("src", browser.runtime.getURL(`assets/sei_chave_restrito_pendente.gif`)).closest('a').on("click", function(e) {
-			e.preventDefault();
-			var $anchor_doc = $('#frmArvore').find("#anchor" + this.id.replace(/[^\d]/g,""));
-			var desc = $anchor_doc.text().replace(/\s*\(\d+\)\s*$/,"");
-			if (desc && (mdesc = desc.match(/\s*[^\s]+\s*(.*)\s*$/i))) desc = mdesc[1];
-			else desc = "";
+	
+	$(window).ready(function() {
+		waitDocumentReady(document).then(arvore => {
+			$(arvore).find('[src*=restrito]').filter('[title*="Pendente"]').attr("src", browser.runtime.getURL(`assets/acesso_restrito_pendente.svg`));
 
-			let num_serv = Number($('#hdnServico').val()), desc_items = undefined;
-			if (!num_serv) {
-				num_serv = parseServicoByTipo($(".infraArvore > a > span[id^='span']").attr('title'));
-				if (num_serv) num_serv = num_serv.num;
-			}
-			
-			if (num_serv) desc_items = ["do " + getDescServico(num_serv)];
+			$(arvore).find('[src*=restrito]').closest('a').on("click", function(e) {
+				e.preventDefault();
+				var id = this.id.replace(/\D/g,"");
+				var $anchor_doc = $(arvore).find("#anchor" + id);
+				var is_pdf = /[^a-z]pdf\b/i.test($(`#anchorImg${id} img`).attr("src"));
+				var desc = $anchor_doc.text().replace(/\s*\(\d+\)\s*$/,"");
+				if (desc && (mdesc = desc.match(/\s*[^\s]+\s*(.*)\s*$/i))) desc = mdesc[1];
+				else desc = "";
+	
+				let num_serv = Number($('#hdnServico').val()), desc_items = undefined;
+				if (!num_serv) {
+					num_serv = parseServicoByTipo($(".infraArvore > a > span[id^='span']").attr('title'));
+					if (num_serv) num_serv = num_serv.num;
+				}
 				
-			var current_a = this;
-			var doc_id = current_a.id.match(/\d+$/);
-			if (url_alterar_recebido = (new RegExp(`controlador\\.php\\?acao=documento_alterar(?:_recebido)?&[^"]+id_documento=${doc_id}[^"]+`, "i")).exec(html)) {
-				openFormDlg([{id: "acesso", type: "radio", label: "Informe nível de acesso", items: ["Restrito (Pessoal)", "Público"], vertical: true, value: 0},
-							 {id: "desc", type: "text", label: "Descrição do documento", width: 300, autofocus: true, items: desc_items, value: desc},
-							 {id: "fund_restrito", type: "check", label: "Opções", text: "Registrar fundamento LGPD", value: localStorage.fund_restrito != undefined?localStorage.fund_restrito:true}], 
-							 "Alteração [Confirmar]").then(data => {
-						
-						localStorage.fund_restrito = data.fund_restrito;	
-						
-						waitMessage("Atualizando nível de acesso...");
-						updateFormSEI(url_alterar_recebido, "frmDocumentoCadastro", "btnSalvar", function (doc) {
-							if (data.acesso) {
-								if ($optPublico = $(doc).find("#optPublico")) $optPublico.trigger("click");
-								else return false;
-							} else {
-								if ($optRestrito = $(doc).find("#optRestrito")) {
-									$optRestrito.prop("checked", true);
-									if ($selHipo = $(doc).find("#selHipoteseLegal")) $selHipo.val(34);
-									else return false;
-									
-									if (data.fund_restrito) $(doc).find("#txaObservacoes").val("Com base na LGPD, documento de identificação de pessoa física com informação biométrica, endereço de pessoa física, números de CPF ou RG, assim como, data de nascimento, e-mail pessoal e número de telefone fixo/móvel pessoal são informações pessoais.");
-								} else return false;
-							}
-							
-							if (data.desc != desc) $(doc).find("#txtNumero").val(data.desc);
-							
-						}).then(()=>{
-							if (data.acesso) $(current_a).remove();
-							else {
-								$(current_a).find("img").attr("src", "imagens/sei_chave_restrito.gif").attr("title", "Acesso Restrito\nInformação Pessoal (Art. 31 da Lei nº 12.527/2011)");
-								$(current_a).off("click");
-							}
-							
-							if (data.desc != desc) {
-								if (desc) data.desc = $anchor_doc.text().replace(desc, data.desc);
-								else if (mdesc = $anchor_doc.text().match(/^\s*([\w\d]+).*(\(\d+\))/)) data.desc = mdesc[1] + " " + data.desc + " " + mdesc[2];
-									 else data.desc = $anchor_doc.text();
-
-								$anchor_doc.find('span').text(data.desc).attr("title", data.desc);
-							}
-							
-							notify("success", "Nível de acesso atualizado com sucesso");
-						}).catch(() => notify("fail", "Nível de acesso NÃO foi atualizado"));
-				});
-			}
+				if (num_serv) desc_items = ["do " + getDescServico(num_serv)];
+					
+				var current_anchor = this;
+				var doc_id = current_anchor.id.match(/\d+$/);
+				if (url_alterar_recebido = (new RegExp(`controlador\\.php\\?acao=documento_alterar(?:_recebido)?&[^"]+id_documento=${doc_id}[^"]+`, "i")).exec(html)) {
+					let fields = [{id: "acesso", type: "radio", label: "Informe nível de acesso", items: ["Público", "Restrito (Pessoal)"], vertical: true, value: 1}];
+					
+					if (is_pdf) fields.push({id: "desc", type: "text", label: "Descrição do documento", width: 300, autofocus: true, items: desc_items, value: desc});
+					
+					// fields.push({id: "fund_restrito", type: "check", label: "Opções", text: "Registrar fundamento LGPD", value: localStorage.fund_restrito != undefined?localStorage.fund_restrito:true});
+	
+					openFormDlg(fields, "Alteração [Confirmar]").then(data => {
+							// localStorage.fund_restrito = data.fund_restrito;	
+							alterarDocumento(url_alterar_recebido, current_anchor, data.desc, data.acesso).then(()=>{
+								notify("success", "Documento atualizado com sucesso");
+							}).catch(() => notify("fail", "Documento NÃO foi atualizado"));
+					});
+				}
+			});
+			
+			//Alterar texto de arrasto
+			$(arvore).find('a[id^="anchorImg"]').on('dragstart', setDragText);
 		});
-		
-		//Alterar texto de arrasto
-		$('a[id^="anchorImg"]').on('dragstart', setDragText);
 	});
 }
 
@@ -453,68 +430,6 @@ function setDragText(e) {
 	e.originalEvent.dataTransfer.setData("sei/number", sei_number);
 }
 
-//Atualizar árvore anterior à implementação de envio pelos correios pelo SEI
-// Mais tarde, será implementada a automatização do procedimento do SEI
-function ___updateArvore() {
-	
-	$('body').ready(function() {
-		
-		if (observer) {
-			observer.disconnect();
-			observer = null;
-		}
-		
-		//--- adicionar opções de correios
-		if (!getCurrentUsuarioExterno()) {
-			const of_regex = /Of[ií]cio\s+\d+\s*\(\d+\)/i;
-			
-			let $anchorOf = $('#frmArvore').find('[id^=anchorA]').prevUntil('[target=ifrVisualizacao]').prev('[target=ifrVisualizacao]').filter(function() {return $(this).text().match(of_regex)});
-			$anchorOf.each(function() {
-				let id = this.id.replace(/\D/g,"");
-				if (!$('#anchorC' + id).get(0)) {
-					let $a = $(`<a id="anchorC${id}" href="javascript:void(0);"><img title="Encaminhar via correio"></a>`);
-					$a.find("img").attr("src", browser.runtime.getURL("assets/correios.png"));
-					$('#frmArvore').find('#anchorA' + id).after($a);
-					$a.click(enviarOficioPelosCorreios)
-				}
-			});
-			
-			//--- atualizar pastas fechadas
-			var pastas_fechadas = $('#frmArvore [id^=divPASTA]').filter(function() {return $(this).find('a[target=ifrVisualizacao]').length == 0}).get();
-			
-			if (pastas_fechadas.length) {
-				//--- cria uma nova instância de observador
-				observer = new MutationObserver(function(mutations) {
-					
-					mutations.forEach(function(mut) {
-						if (mut.addedNodes.length && (node = mut.addedNodes[0])) {
-							if ($(node).is('[id^=anchorA]') && (ad = $(node).prevUntil('[target=ifrVisualizacao]').prev().get(0)) && $(ad).text().match(of_regex)) {
-								let id = ad.id.replace(/\D/g,"");
-								let $a = $(`<a id="anchorC${id}" href="javascript:void(0);"><img title="Encaminhar via correio"></a>`);
-								$a.find("img").attr("src", browser.runtime.getURL("assets/correios.png"));
-								$(node).after($a);
-								$a.click(enviarOficioPelosCorreios);
-							}
-							
-							if ($(node).is('a[id^="anchorImg"]')) $(node).on('dragstart', setDragText);
-						}
-					});
-					
-				});
-				
-				//--- configuração do observador
-				var config = {childList: true };
-				 
-				//--- passar o nó alvo, bem como as opções de observação
-				pastas_fechadas.forEach(pasta => {
-					observer.observe(pasta, config);
-				});
-			}
-			
-		} else $('[src*="correios.png"]').closest('a').remove();
-	});
-}
-
 //Atualizar árvore
 function updateArvore() {
 	
@@ -550,35 +465,5 @@ function updateArvore() {
 			});
 		}
 			
-	});
-}
-
-
-//Enviar ofício pelo correio
-function enviarOficioPelosCorreios(e) {
-	alert('Em desenvolvimento');
-	return;
-	
-	let id = e.currentTarget.id.replace(/\D/g,"");
-	let ref = $('#anchor' + id).text();
-	if (m = ref.match(/^\s*(([^\s]+).*?(\d*))\s*\(?(\d+)\)?\s*$/)) ref = {text: m[1], tipo: filterAccents(m[2], String.prototype.toLowerCase), num: m[3], sei: m[4]};
-	
-	if (!ref) {
-		errorMessage("Não foi possível identificar o ofício");
-		return;
-	}
-	
-	confirmMessage(`Encaminhar ${ref.text} via correio?`).then(() => {
-		
-		waitMessage(`Encaminhando ${ref.text}...`);
-		atualizarAndamento(`Solicita-se ao protocolo a expedição do Ofício ${ref.num} (SEI nº ${ref.sei}), por meio de Correspondência Simples Nacional com Aviso de Recebimento.`).then(() => {return enviarProcesso("sede", true, 1)}).then(msg => {
-			waitMessage(null);
-			window.location.reload();			
-			chrome.runtime.sendMessage({action: "notify-success", content: "Encaminhamento concluído com sucesso"});
-		}).catch(msg => {
-			waitMessage(null);
-			chrome.runtime.sendMessage({action: "notify-fail", content: msg});
-		});
-		
 	});
 }

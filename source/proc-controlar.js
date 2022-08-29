@@ -11,8 +11,9 @@ function updateTable(tb) {
 	let create_col = ($(tb + ' th[name="headerUMI"]').length == 0);
 	
 	if (create_col) { 
-		let $header = $('<th name="headerUMI" class="tituloControle" title="Última Movimentação do Interessado">UMI&nbsp;&nbsp;<img></img></th>');
-		$header.find('img').attr('src', browser.runtime.getURL("assets/sorted.png"));
+		let fth = document.querySelector(tb + ' th');
+		let $header = $(`<th name="headerUMI" class="${fth ? fth.className : 'tituloControle'}" title="Última Movimentação do Interessado">UMI</th>`);
+		// $header.find('img').attr('src', browser.runtime.getURL("assets/sorted.png"));
 		$(tb + " tbody tr:first-child").append($header);
 	}
 	
@@ -41,7 +42,7 @@ function updateTable(tb) {
 				switch (m[1].toLowerCase()) {
 					case "dde":
 					case "umi": 
-						row.umi = new Date(m[5], m[4] - 1, m[3]);
+						row.umi = m[2].toDate();
 						$col_umi.text(m[2]);
 						break;
 					case "status":
@@ -81,8 +82,11 @@ function updateFiltros() {
 	if (!div_situacao) {
 		let div_filtros = document.getElementById("divFiltro");
 		if (!div_filtros) return;
+
+		let div_styles = window.getComputedStyle(div_filtros.querySelector('div'));
+		let position = div_styles.getPropertyValue('position');
 		
-		div_situacao = $(`	<div id="divSituacao" style="position: absolute;left: 85%;top: 20%;">
+		div_situacao = $(`	<div id="divSituacao" class="divLink" style="left: 85%;top: 20%;${position?'position:' + position + ';':''}">
 								<label>Situação: </label>
 								<select id="selSituacao">
 									<option value="0">Todas</option>
@@ -94,6 +98,8 @@ function updateFiltros() {
 							</div>`).get(0);
 							
 		div_filtros.appendChild(div_situacao);
+
+
 		
 	} else $(div_situacao).off("change");
 	

@@ -1,6 +1,6 @@
-﻿(function() {
+(function() {
 	"use strict";
-	
+
 	var lastBarCell = null;
 	
 	function EdTable(table, options) {
@@ -16,6 +16,8 @@
 			else $(this.table).append('<thead />');			
 			
 			let $tr = $(document.createElement('tr'));
+
+			if (this.options.showLineNumber) $tr.append(`<th>#</th>`);
 			for (let column of this.options.columns) {
 				let attr = "";
 				if (column.width) attr = ` style="width:${column.width};"`;
@@ -30,12 +32,27 @@
 		add: function(data, forceEmpty = false, selectCell = -1) {
 				if (!data) data = {};
 				let $tr = $(document.createElement('tr'));
+
 				let changeEvent = false;
+
+				if (this.options.showLineNumber) $tr.append('<td></td>');
+
 				for (let column of this.options.columns) {
 					let value = data[column.id];
 					let attr = "";
 
 					if (forceEmpty && value === undefined) value = "";
+
+					if (column.dynamicType) {
+						let dtype;
+						for (dtype of column.dynamicType) {
+							if (dtype.condition === undefined || testExpression(dtype.condition, null, data)) break;
+						}
+						column.type = dtype.type;
+						
+						if (column.type == "select") column.options = convertSelectOptions(dtype.options);
+						else column.options = dtype.options;
+					}					
 					
 					switch (column.type) {
 						case 'select': 
@@ -111,10 +128,10 @@
 			
 			if (data) {
 				
-				if (Array.isArray(data)) rows = data;
+				if (Array.isArray(data)) rows = JSON.parse(JSON.stringify(data));
 				else if (typeof data == "function") {
 					try {
-						rows = data.call(this.table);	
+						rows = JSON.parse(JSON.stringify(data.call(this.table)));
 					} catch(ex) {
 						rows = null;
 					}
@@ -135,12 +152,14 @@
 			return true;
 		},
 		
-		get: function() {
+		get: function(index) {
 			let result = [];
 			$(this.table).find('tbody tr').each((idx,tr) => {
 				if (this.isEmpty(tr)) return;
 				result.push(tr.data);
 			});
+
+			if (index !== undefined && index < result.length) return result[index];
 			
 			return result;
 		},
@@ -158,8 +177,14 @@
 		},
 		
 		select: function(td) {
+			if (this.cellEditting && this.cellEditting !== td) {
+				let column = getColumnDefines(this.cellEditting);
+				if (column.type == "multi") this.end(true);
+			}
+
 			if (!td || this.cellSelected == td || this.cellEditting) return;
-			
+			if (this.options.showLineNumber && !td.cellIndex) return;
+
 			$(this.table).find('.edtable-selected').removeClass('edtable-selected');
 			$(td).addClass('edtable-selected');
 			this.cellSelected = td;
@@ -182,7 +207,7 @@
 			if (this.bar) this.hidebar();
 			
 			
-			let column = this.options.columns[td.cellIndex];
+			let column = getColumnDefines(td);
 			
 			if (column.type == 'check') return false;
 			
@@ -193,13 +218,33 @@
 					if (value !== '') value = Number(value) + delta;
 					return value;
 				};
+
+				let is_input = true;
+
+				if (column.dynamicType) {
+					let dtype;
+					for (dtype of column.dynamicType) {
+						let row = this.cellSelected.closest('tr').data;
+						if (dtype.condition === undefined || testExpression(dtype.condition, null, row)) break;
+					}
+					column.type = dtype.type;
+					
+					if (column.type == "select") column.options = convertSelectOptions(dtype.options);
+					else column.options = dtype.options;
+				}
 				
 				switch (column.type) {
 					case 'select': 
 						column.editor = document.createElement('select');
+
 						if (column.options instanceof Map) for (let [k, v] of column.options) $(column.editor).append($('<option>').attr('value', k).text(v));
 						else for (let v of column.options) $(column.editor).append($('<option>').text(v));
 						
+						break;
+
+					case 'multi':
+						column.editor = createMultiSelector(column.options);
+						is_input = false;
 						break;
 						
 					default:
@@ -207,19 +252,35 @@
 						$(column.editor).attr('type', column.type);
 						break;
 				}
-				
-				if (column.attributes) for (let [k,v] of column.attributes) $(column.editor).attr(k,v);
-				
-				$(column.editor).addClass('edtable-input')
-								.css('display', 'none')
-								.css('position', 'fixed')
-								.css('border', 'none')
-								.css('font', window.getComputedStyle(td).getPropertyValue('font').toString())
-								.css('padding-left', deltaCSS(td, 'padding-left', -1))
-								.css('padding-top', 0)
-								.css('background', 'transparent')
-								.css('visibility', 'visible');
+
+				if (is_input) {
+					if (column.attributes) for (let [k,v] of column.attributes) $(column.editor).attr(k,v);
+					
+					$(column.editor).addClass('edtable-input')
+									.css('display', 'none')
+									.css('position', 'fixed')
+									.css('border', 'none')
+									.css('font', window.getComputedStyle(td).getPropertyValue('font').toString())
+									.css('padding-left', deltaCSS(td, 'padding-left', -1))
+									.css('padding-top', 0)
+									.css('background', 'transparent')
+									.css('visibility', 'visible');
+				}
+
+				column.editor.column = column;			
+				column.editor.table = td.closest('table');			
 			}
+
+			column.editor.cell = {col: td.cellIndex, row: td.closest('tr').rowIndex};
+
+			if (column.type == "multi") {
+				column.editor.open(td, $(td).text()).then(store => this.end(store));
+				td.editting = true;
+				this.cellEditting = td;
+				return true;
+			}
+
+			if (column.type == "text" && column.intellisense) enableIntellisense(column.editor, column.intellisense);
 			
 			let rect = td.getBoundingClientRect();
 			$(column.editor).css('left', rect.left+1)
@@ -254,18 +315,25 @@
 				}
 			}
 			
-			if (startValue && column.type != 'select') $(column.editor).val(startValue).css('display', 'block').focus();
-			else $(column.editor).val(value).css('display', 'block').focus().select();
+			if (startValue && column.type != 'select') {
+				$(column.editor).val(startValue).css('display', 'block').focus();
+				if (column.type == "text" && column.intellisense && column.intellisense.tokens && column.intellisense.tokens.includes(startValue)) {
+					column.editor.selectionStart = column.editor.selectionEnd = 0;
+					column.editor.dispatchEvent(new KeyboardEvent('keypress',{key: startValue}));
+					column.editor.selectionStart = column.editor.selectionEnd = 1;
+				} 
+			} else $(column.editor).val(value).css('display', 'block').focus().select();
 			
 			$(column.editor).on('keydown', e => {
 				if (e.key == 'Enter') {
 					this.end(true);
 					let next_td  = td.nextSibling;
+					let next_cellIndex = this.options.showLineNumber ? 1 : 0;
 					
 					if (!next_td) {
 						let next_tr = td.closest('tr').nextSibling;
-						if (next_tr) next_td = next_tr.children[0];
-						else return this.add(null, true, 0);
+						if (next_tr) this.select(next_td = next_tr.children[next_cellIndex]);
+						else return this.add(null, true, next_cellIndex);
 					} else return this.select(next_td);
 				}
 				
@@ -290,35 +358,63 @@
 		
 		end: function(store = true) {
 			if (!this.cellEditting) return false;
-			
-			let $input = $(this.cellEditting).find('.edtable-input');
-			let column = this.options.columns[this.cellEditting.cellIndex];
-			
-			let value = $input.val();
+
+			var column = getColumnDefines(this.cellEditting);
+			var input, value;
+
+			if (column.type == "multi") {
+				if (store === true) return column.editor.close(true);
+				value = store;
+			} else {
+				input = this.cellEditting.querySelector('.edtable-input');
+				value = $(input).val();
+			}
 			
 			if (store) {
-				if (column.validation) {
+				if (column.type != "multi" && column.validation) {
 					let result = true;
 					if (column.validation instanceof RegExp) result = value.toString().match(column.validation);
 					if (result && typeof column.validation == 'function') result = column.validation.call({column: column, value: value});
 					if (!result) {
 						this.select(this.cellEditting);
-						$input.focus().select();
+						$(input).focus().select();
 						return;
 					}
 				}
+
+				let row_data = this.cellEditting.closest('tr').data;
+
+				//varrer colunas dinâmicas para verificar a integridade com as dependências
+				if (row_data[column.id] != value && this.options.hasDynamicTypes) {
+					for (let i = 0; i < this.options.columns.length; i++) {
+						if (this.options.columns[i].dynamicType) {
+							for (let dtype of this.options.columns[i].dynamicType) {
+								if (dtype.condition && dtype.condition.indexOf(`$${column.id}`) !== -1) {
+									row_data[this.options.columns[i].id] = undefined;
+									$(this.cellEditting).closest('tr').find(`td:nth-child(${i+(this.options.showLineNumber ? 2 : 1)})`).text("");
+									break;
+								}
+							}
+						}
+					}
+				}
 				
-				$(this.cellEditting).closest('tr').get(0).data[column.id] = value;
+				row_data[column.id] = value;
 				if (column.type == 'select' && column.options instanceof Map) value = column.options.has(value) ? column.options.get(value) : "";
 				$(this.cellEditting).text(value);
 			}
 			
-			$input.css('display', 'none').remove();
-			$(this.cellEditting).css('visibility', '');
+			if (column.type != "multi") {
+				$(input).css('display', 'none').remove();
+				$(this.cellEditting).css('visibility', '');
+			} 
+
+			if (input.intellisense) delete input.intellisense;			
 			
 			this.cellEditting.editting = false;
 			this.table.focus();
 			this.cellEditting = null;
+			if (column.dynamicType) column.editor = undefined;
 		},
 		
 		showbar: function(tr) {
@@ -329,7 +425,7 @@
 			if (!this.bar) {
 				this.bar = document.createElement('div');
 				this.bar.className = "edtable-bar";
-				$(this.bar).append('<span class="edtable-up-btn">&#8679;</span>&nbsp;<span class="edtable-down-btn">&#8681;</span>&nbsp;<span class="edtable-del-btn">&#9746;</span>');
+				$(this.bar).append('<span class="edtable-bar-btn edtable-up-btn">&#8679;</span>&nbsp;<span class="edtable-bar-btn edtable-down-btn">&#8681;</span>&nbsp;<span class="edtable-bar-btn edtable-del-btn">&#9746;</span>');
 			}
 			
 			$(tr.children[0]).prepend(this.bar);
@@ -347,14 +443,20 @@
 			
 			console.log('hide bar');
 		}
-		
-		
 	};
+
+	function getColumnDefines(td) {
+		var options = td.closest('table').EdTable.options;
+		var index = td.cellIndex;
+		if (options.showLineNumber) index--;
+
+		return options.columns[index];
+	}
 	
 	function inputChange(e) {
 		let table = $(e.target).closest('table').get(0);
 		let td = $(e.target).closest('td').get(0);
-		let column = table.EdTable.options.columns[td.cellIndex];
+		let column = getColumnDefines(td);
 		
 		if (column.type == 'check' || column.type == 'select') {
 			let tr = $(td).closest('tr').get(0);
@@ -362,8 +464,6 @@
 			table.EdTable.select(td);
 			table.focus();
 		}
-		
-		
 	}
 	
 	function tableKeyDown(e) {
@@ -454,7 +554,7 @@
 			default:
 				if (e.key.length == 1) {
 					e.preventDefault();
-					let column = edtable.options.columns[td.cellIndex];
+					let column = getColumnDefines(td);
 					
 					if (e.key == " ") {
 						if (column.type == 'check') {
@@ -518,18 +618,40 @@
 		lastBarCell = elem;
 
 		let table = elem.closest('table');
-		if (elem.tagName != 'TD' && elem.tagName != 'INPUT' && elem.tagName != 'DIV') return table.EdTable.hidebar();
+		if (elem.tagName != 'TD' && elem.tagName != 'INPUT' && elem.tagName != 'DIV' && elem.tagName != 'SPAN') return table.EdTable.hidebar();
 		
 		table.EdTable.showbar(elem.closest('tr'));
 	}
 	
+
+	function convertSelectOptions(options) {
+		if (Array.isArray(options) || options instanceof Map) return options;
+
+		var result = options; 
+		if (typeof options == "string") {
+			let opts = options.split(",");
+			
+			if (options.indexOf("=") != -1) {
+				result = new Map();
+				
+				for (let opt of opts) {
+					opt = opt.split("=");
+					result.set(opt[0].trim(), (opt.length > 1) ? opt[1].trim() : opt[0].trim());
+				}
+			} else  result = opts;
+		}
+
+		return result;
+	}
+
 	
 	function initEdTable(table, options) {
 		if (!table instanceof HTMLTableElement) return null;
 		
 		$(table).find('tbody,thead,tr').remove();
 		
-		table.className = table.className ? "edtable " + table.className.replace(/\s*edtable\s*/g, "") : "edtable";
+		table.classList.add('edtable');
+		if (options.showLineNumber) table.classList.add('edtable-line-number');
 		
 		options.fixedHeader = options.scrollY !== undefined || options.fixedHeaderClass;
 		
@@ -552,25 +674,15 @@
 				} else column.width = 0;
 			}
 			
-			switch (column.type) {
-				case 'select': 
-					if (typeof column.options == "string") {
-						let select_options;
-						let opts = column.options.split(",");
-						
-						if (column.options.indexOf("=") != -1) {
-							select_options = new Map();
-							
-							for (let opt of opts) {
-								opt = opt.split("=");
-								select_options.set(opt[0].trim(), (opt.length > 1) ? opt[1].trim() : opt[0].trim());
-							}
-						} else  select_options = opts;
-						
-						column.options = select_options;
-					}
-					
-					break;
+			if (typeof column.type == "object") {
+				column.dynamicType = column.type;
+				options.hasDynamicTypes = true;
+			} else {
+				switch (column.type) {
+					case 'select': 
+						column.options = convertSelectOptions(column.options);
+						break;
+				}
 			}
 		}
 		
@@ -633,7 +745,8 @@
 							   deleteMsg: undefined,				// Mensagem de exclusão
 							   infoRecords: true,					// Exibir informações de registros 
 							   order: 1,							// Indicação da coluna de ordenação da tabela. ex: -2 --> ordenação decrescente pela segunda coluna
-							   showBar: false						//Exibir barra de comandos
+							   showBar: false,						//Exibir barra de comandos
+							   showLineNumber: false				//Exibir número da linha
 							   };
 							   
 		for (let prop in default_options) if (default_options.hasOwnProperty(prop) && default_options[prop] !== undefined && options[prop] == undefined) options[prop] = default_options[prop];

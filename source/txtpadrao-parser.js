@@ -16,11 +16,12 @@ script_beforesave.textContent = `var hsbs = setInterval(function() {
 (document.body||document.documentElement).appendChild(script_beforesave);
 
 //Localizar editor com o documento automatizável
-var editor, alt_editor, html, tipo_doc;
+var metadata, editor, alt_editor, html, tipo_doc;
 $("#frmEditor [name^='txaEditor_']").each((i, ed) => {
 	if (editor) return false;
 	html = $(ed).val();
-	if (html.match(/<p[^>]*>%INIT\([\w\W]*?\)%[\w\W]*?<\/p>/i)) editor = ed;
+	if (html.match(/<p[^>]*>\s*(?:%INIT\([\w\W]*?\)%|#CFOR-MD-BEGIN;[\w\W]*?#CFOR-MD-END;)[\w\W]*?<\/p>/i)) editor = ed;
+
 	if (!editor && html.match(/@tratamento_destinatario@|o\s*gerente\s*regional\s*da\s*anatel(?:<\/[^>]*?>)?\s*,/i)) alt_editor = ed;
 	if (i == 1 && html.match(/\bAto\s+n[^\s]+\s+\d+/i)) tipo_doc = "ato";
 });
@@ -33,131 +34,107 @@ if (!editor) {
 
 //Executar automação do documento
 if (editor) {
+	//carregar documento
 	html = $(editor).val();
 
-	//--- INICIALIZAÇÃO DAS VARIÁVEIS INTERNAS
+	//escapar caracteres
+	html = html.replace(/&#(\d+);/g, (m0, code) => {
+		return String.fromCharCode(parseInt(code));
+	});	
 
-	var m, esp_proc, desc_servico, ind_servico, cod_servico, sigla_servico, cpfj_dest, cpfj_int, fields, references, inputs, usu_sei_ok;
+	//executar substituições dos campos e funções LEGADAS - (serão descontinuadas em vesões futuras)
+	html = html.replace(/%ref\(\s*([^;@)]+(?:@([^;)]+))?)(?:\s*;\s*([^)]*)\s*)?\)%/ig, (m0, name, format, _default) => "$ref." + name + (format ? "@" + format : "") + (_default ? "??" + _default : ""));
+	html = html.replace(/\$ref.sei@link/ig, "$ref.link");
+	/**@todo: executar substituições configuradas */
+
+
+	//--- INICIALIZAÇÃO DOS METADADOS
+
+	var metadata, m, info_servico, usu_sei_ok;
+
 	let regex = /<p[^>]*>%INIT\(([^,]*?),(.*?),\s*([\d\.\-]+|@[\w_]+@|)\s*,\s*([\d\.\-\/]+|@[\w_]+@|)\s*,\s*([\d\.\-]+|@[\w_]+@|)\s*,\s*([\d\.\-\/]+|@[\w_]+@|)\s*\)%(?:%FIELDS\(([\w\W]*?)\)%)?(?:%REFS\(([\w\W]*?)\)%)?(?:%INPUTS\(([\w\W]*)\)%)?<\/p>/i;
 
+	let $area = $('<textarea />');
+	let cpfj_validator = /(?:\d{3}\.?\d{3}\.?\d{3}|\d{2}\.?\d{3}\.?\d{3}\/?\d{4})\-\d\d/;
+	let sei_field_regex = /\@[\w_]*?\@/ig;
+
+
+	//VERSÃO 1 - Metadado (será descontinuada futuramente)
 	html = html.replace(regex, (m0, m1, m2, m3, m4, m5, m6, m7, m8, m9) => {
-		var set_servico = function(cod) {
-			cod_servico = ("000" + cod).slice(-3); 
-			switch (parseInt(cod)) {
-				case 19: 
-					desc_servico = "Serviço Limitado Privado"; 
-					ind_servico = "Limitado Privado"; 
-					sigla_servico = "SLP";
-					break;
-
-				case 251:
-					desc_servico = "Serviço Auxiliar de Radiodifusão e Correlatos, submodalidade Ligação para Transmissão de Programas"; 
-					ind_servico = "SARC(251)"; 
-					sigla_servico = "SARC";
-					break;
-
-				case 252:
-					desc_servico = "Serviço Auxiliar de Radiodifusão e Correlatos, submodalidade Reportagem Externa"; 
-					ind_servico = "SARC(252)"; 
-					sigla_servico = "SARC";
-					break;
-					
-				case 253:
-					desc_servico = "Serviço Auxiliar de Radiodifusão e Correlatos, submodalidade Comunicação de Ordens Internas"; 
-					ind_servico = "SARC(253)"; 
-					sigla_servico = "SARC";
-					break;
-					
-				case 254:
-					desc_servico = "Serviço Auxiliar de Radiodifusão e Correlatos, submodalidade Telecomando"; 
-					ind_servico = "SARC(254)"; 
-					sigla_servico = "SARC";
-					break;
-					
-				case 255:
-					desc_servico = "Serviço Auxiliar de Radiodifusão e Correlatos, submodalidade Telemedição"; 
-					ind_servico = "SARC(255)"; 
-					sigla_servico = "SARC";
-					break;
-					
-				case 302: 
-					desc_servico = "Serviço de Radioamador"; 
-					ind_servico = "Radioamador"; 
-					sigla_servico = "RA";
-					break;
-
-				case 400: 
-					desc_servico = "Serviço Rádio do Cidadão"; 
-					ind_servico = "Rádio do Cidadão"; 
-					sigla_servico = "PX";
-					break;
-
-				case 507: 
-					desc_servico = "Serviço Limitado Móvel Aeronáutico"; 
-					ind_servico = "Limitado Móvel Aeronáutico"; 
-					sigla_servico = "SLMA";
-					break;
-
-				case 604: 
-					desc_servico = "Serviço Limitado Móvel Marítimo"; 
-					ind_servico = "Limitado Móvel Marítimo"; 
-					sigla_servico = "SLMM";
-					break;
-			}
-		}
-		
-		let $area = $('<textarea />');
-		
-		m1 = $area.html(m1).text().trim().toLowerCase();
-		switch (m1) {
-			case "outorga: rádio do cidadão": set_servico(400); break;
-			case "outorga: radioamador": set_servico(302); break;
-			case "outorga: slp": set_servico(19); break; 
-			case "outorga: limitado móvel aeronáutico": set_servico(507); break; 
-			case "outorga: limitado móvel marítimo": set_servico(604); break; 
-			default:
-				if (m2) {
-					m2 = $('<textarea />').html(m2).text();
-					switch (true) {
-						case /\bLTP\b|\b251\b|Transmiss.o\s+de\s+Programas?/i.test(m2): set_servico(251); break; 
-						case /\bRE\b|\b252\b|Reportagem\s+Externa/i.test(m2): set_servico(252); break; 
-						case /\bOI\b|\b253\b|Ordens\s+Internas?/i.test(m2): set_servico(253); break; 
-						case /\bTC\b|\b254\b|Telecomando/i.test(m2): set_servico(254); break; 
-						case /\bTM\b|\b255\b|Telemedi..o/i.test(m2): set_servico(255); break;
-						default:
-							if (m = m2.match(/\b(?:0?19|302|400|507|604)\b/)) set_servico(m[0]);
-					}
-				}
-		}
-		
-		var cpfj_regex = /[\d\.-\/]+/;
-		cpfj_int = cpfj_regex.test(m3)?m3:cpfj_regex.test(m4)?m4:undefined;
-		cpfj_dest = cpfj_regex.test(m5)?m5:cpfj_regex.test(m6)?m6:undefined;
-		
-		esp_proc = m2;
-		
-		if (m7) fields = fieldsFromString($area.html(m7).text());
-		if (m8) references = referencesFromString($area.html(m8).text());
-		if (m9) inputs = $area.html(m9).text().replace(/(?<=[{,:]\s*)[a-z_]\w*(?=\s*:)/ig, '"$&"');
-		
-		if (!cpfj_int && (c = findFieldValue(fields, "cpf", "num") || findFieldValue(fields, "cnpj", "num")) && validateCpfj(c)) cpfj_int = c;
+		metadata = { 
+			proc: $area.html(m1).text().trim(), 
+			spec: $area.html(m2).text().trim(), 
+			inter: (m3 ?? '') + (m4 ?? ''), 
+			dest: (m5 ?? '') + (m6 ?? ''), 
+			fields: $area.html(m7).text(), 
+			refs: $area.html(m8).text(), 
+			settings: {inputs: $area.html(m9).text()}
+		};
 
 		return "";
 	});
+
+	//VERSÃO 2 - Metadado
+	html = html.replace(/#CFOR-MD-BEGIN;[\w\W]*#CFOR-MD-END;/i, m0 => {
+		metadata = parseMetadata($area.html(m0).text().trim(), 'CFOR-MD-');
+		return "";
+	});
+
+
+	//Sanitizar metadados
+	for (let k in metadata) {
+		if (typeof metadata[k] == 'string') metadata[k] = metadata[k].replace(sei_field_regex, '');
+	}
+	if (metadata.inter && !metadata.inter.match(cpfj_validator)) metadata.inter = '';
+	if (metadata.dest && !metadata.dest.match(cpfj_validator)) metadata.dest = '';
+
+
+	switch (metadata.proc.toLowerCase()) {
+		case "outorga: rádio do cidadão":  info_servico = consultarServicoTelecom(400); break;
+		case "outorga: radioamador": info_servico = consultarServicoTelecom(302); break;
+		case "outorga: slp": info_servico = consultarServicoTelecom(19); break;
+		case "outorga: limitado móvel aeronáutico": info_servico = consultarServicoTelecom(507); break;
+		case "outorga: limitado móvel marítimo": info_servico = consultarServicoTelecom(604); break;
+		default:
+			if (metadata.spec) {
+				switch (true) {
+					case /\bLTP\b|\b251\b|Transmiss.o\s+de\s+Programas?/i.test(metadata.spec): info_servico = consultarServicoTelecom(251); break;
+					case /\bRE\b|\b252\b|Reportagem\s+Externa/i.test(metadata.spec): info_servico = consultarServicoTelecom(252); break;
+					case /\bOI\b|\b253\b|Ordens\s+Internas?/i.test(metadata.spec): info_servico = consultarServicoTelecom(253); break;
+					case /\bTC\b|\b254\b|Telecomando/i.test(metadata.spec): info_servico = consultarServicoTelecom(254); break;
+					case /\bTM\b|\b255\b|Telemedi..o/i.test(metadata.spec): info_servico = consultarServicoTelecom(255); break;
+					default:
+						if (m = metadata.spec.match(/\b(?:0?19|302|400|507|604)\b/)) info_servico = consultarServicoTelecom(m[0]);
+				}
+			}
+	}
+
+	if (!info_servico) info_servico = consultarServicoTelecom();
+	if (metadata.fields) metadata.fields = fieldsFromString(metadata.fields);
+	if (metadata.ref) metadata.ref = referenceFromData(metadata.ref);
+	if (!metadata.settings) metadata.settings = {};
+	if (metadata.settings.inputs) metadata.settings.inputs = metadata.settings.inputs.replace(/(?<=[{,:]\s*)[a-z_]\w*(?=\s*:)/ig, '"$&"');
+	if (!metadata.inter && (c = findFieldValue(metadata.fields, "cpf", "num") || findFieldValue(metadata.fields, "cnpj", "num")) && validateCpfj(c)) metadata.inter = c;	
 	
 	
 	
-	//--- VARIÁVEIS DEFINIDAS PELO USUÁRIO
+	//--- INICIALIZAÇÃO DE VARIÁVEIS GERAIS
+	//funções básicas para referência
+	var create_ref_link = ref => ref.link = `<span data-cke-linksei="1" style="text-indent:0px;" contenteditable="false"><a id="lnkSei${ref.id}" class="ancoraSei" style="text-indent:0px;">${ref.sei}</a></span>`;
+	var ref_to_text = ref => ref ? (ref.name || ref.nome) + " (" + ref.sei + ")" : "";
 	
 	var uservars = {hoje: (new Date()).toDateBR()};
-	if (fields) fields.forEach(f => uservars[identityNormalize(f.name)] = f.value);
-	
+	if (metadata.fields) metadata.fields.forEach(f => uservars[identityNormalize(f.name)] = f.value);
+	if (metadata.ref) {
+		create_ref_link(metadata.ref);
+		uservars.ref = metadata.ref;
+	}
 	
 	
 	//--- FUNÇÕES GERAIS
 	
-	//escrver texto destacado
-	var HLText = (text, color) => color?`<span style="background-color:${color};">${text}</span>`:text;
+	//retornar texto destacado
+	var hl_text = (text, color) => color?`<span style="background-color:${color};">${text}</span>`:text;
 
 	//determinar se código numérico é de pessoa física ou jurídica
 	var is_pfj = c => {
@@ -169,32 +146,25 @@ if (editor) {
 	//substituir as variáveis definidas pelo usuário
 	var replace_uservars = (html, empty = true) => {
 		if (!html) return html;
-		return html.replace(/(?:\$(_*?[a-z][\w_]*)(?:@(-?\d+(?:,-?\d+)?|[\w\*]+))?)(?!\w*\s*=)/ig, (m0, name, format) => {
-			if (!uservars.hasOwnProperty(name)) return empty ? "" : "$" + name;
-			return formatValue(uservars[name], format);
+		return html.replace(/\$([a-z_]+(?:\.[a-z_]+|\[\w+?\]|\w+)*)(?:@([\w.-]+\b))?(?:\?\?("[^"]+?"|[^<\s]+?(?=[<\s]|$)))?(\s*=(?!=))?/ig, (m0, name, format, _default, attrib) => {
+			if (attrib) return m0;
+			let value = name.indexOf('.') != -1 || name.indexOf('[') != -1 ? uservars.getValue(name) : uservars[name];
+			if (!value) return _default ? replace_uservars(_default) : (empty ? "" : "$" + name);
+			return formatValue(value, format);
 		});
 	}
 	
-
-
-	//--- INTERPRETAÇÃO DOS CAMPOS E FUNÇÕES DO CFOR
-	
 	// interpretar HTML
 	var parse_html = (html, options = {hlColor: "red", emptyVar: true}) => {
-		
-		//escapar caracters
-		html = html.replace(/&#(\d+);/g, (m0, code) => {
-			return String.fromCharCode(parseInt(code));
-		});	
 		
 		//%desc_servico%, %ind_servico%, %cod_servico% e %sigla_servico%
 		html = html.replace(/%(desc|ind|cod|sigla)_servico(?:@([^%]+))?%/ig, (m0, prefix, format) => {
 			var value;
 			switch (prefix.toLowerCase()) {
-				case "desc": value = desc_servico == undefined?HLText("*** Serviço Desconhecido ***", options.hlColor):desc_servico; break;
-				case "ind": value = ind_servico == undefined?HLText("*** Desconhecido ***", options.hlColor):ind_servico; break;
-				case "cod": value = cod_servico == undefined?'000':cod_servico; break;
-				case "sigla": value = sigla_servico == undefined?'':sigla_servico; break;
+				case "desc": value = info_servico.desc ?? hl_text("*** Serviço Desconhecido ***", options.hlColor); break;
+				case "ind": value = info_servico.servico ?? hl_text("*** Desconhecido ***", options.hlColor); break;
+				case "cod": value = info_servico.cod ?? '000'; break;
+				case "sigla": value = info_servico.sigla ?? ''; break;
 			}
 			
 			return formatValue(value, format);
@@ -205,16 +175,16 @@ if (editor) {
 			let value;
 			
 			if (sufix.toLowerCase() == "int") {
-				if (!cpfj_int) return HLText("*** CPF/CNPJ do Interessado Desconhecido ***", options.hlColor);
-				value = cpfj_int;
+				if (!metadata.inter) return hl_text("*** CPF/CNPJ do Interessado Desconhecido ***", options.hlColor);
+				value = metadata.inter;
 			} else {
-				if (!cpfj_dest) return HLText("*** CPF/CNPJ do Destinatário é Desconhecido ***", options.hlColor);
-				value = cpfj_dest;
+				if (!metadata.dest) return hl_text("*** CPF/CNPJ do Destinatário é Desconhecido ***", options.hlColor);
+				value = metadata.dest;
 			}
 			
 			value = format.includes("num")?value.replace(/\D/g,""):value;
 			
-			if (is_pfj(cpfj_int) == "f") {
+			if (is_pfj(metadata.inter) == "f") {
 				if (format.includes("*")) value = "***" + value.slice(3,-2) + "**"
 				if (prefix) value = "CPF nº " + value;
 			} else {
@@ -228,23 +198,23 @@ if (editor) {
 		//%is_int_pf%, %is_int_pj%, %is_dest_pf% e %is_dest_pj%
 		html = html.replace(/%is_(dest|int)_p(f|j)%/ig, (m0, m1, m2) => {
 			if (m1.toLowerCase() == "dest") {
-				if (m2.toLowerCase() == "f") return is_pfj(cpfj_dest) == "f" ? "1" : "0";
-				else return is_pfj(cpfj_dest) == "j" ? "1" : "0";
+				if (m2.toLowerCase() == "f") return is_pfj(metadata.dest) == "f" ? "1" : "0";
+				else return is_pfj(metadata.dest) == "j" ? "1" : "0";
 			} else {
-				if (m2.toLowerCase() == "f") return is_pfj(cpfj_int) == "f" ? "1" : "0";
-				else return is_pfj(cpfj_int) == "j" ? "1" : "0";
+				if (m2.toLowerCase() == "f") return is_pfj(metadata.inter) == "f" ? "1" : "0";
+				else return is_pfj(metadata.inter) == "j" ? "1" : "0";
 			}
 		});
 		
 		//%is_sarc%
 		html = html.replace(/%is_sarc%/ig, (m0) => {
-			var n = cod_servico == undefined ? 0 : parseInt(cod_servico);
+			var n = parseInt(info_servico.cod ?? 0);
 			return n > 250 && n < 256 ? "1" : "0";
 		});
 		
 		//%usu_sei_ok%
 		html = html.replace(/%usu_sei_ok%/ig, (m0) => {
-			if (usu_sei_ok == undefined) usu_sei_ok = getCurrentUsuarioExterno(fields) ? "1" : "0";
+			if (usu_sei_ok == undefined) usu_sei_ok = getCurrentUsuarioExterno(metadata.fields) ? "1" : "0";
 			return usu_sei_ok;
 		});
 		
@@ -252,57 +222,13 @@ if (editor) {
 		html = html.replace(/%ep_has\(\s*([^)]+)\s*\)%/ig, (m0, expr) => {
 			expr = expr.replace(/\*/g, ".*").replace(/\?/g, ".").replace(/\"/g, "\b").replace(/&nbsp;/g, " ").replace(/<(\w+)[^>]*>(.+)<\/\1>/gi, "$2");
 			
-			return (new RegExp(expr, "i")).test(esp_proc) ? "1" : "0";
+			return (new RegExp(expr, "i")).test(metadata.spec) ? "1" : "0";
 		});
 		
 		//%field(name, format, default)%
 		html = html.replace(/%field\(\s*([^;)@]+)(?:\s*@([^;)]+))?\s*(?:;\s*([^)]+)\s*)?\)%/ig, (m0, name, format, _default) => {
 			_default = _default && _default.replace(/<\/?\w+[^>]*?>/g,"");
-			return (f = findFieldValue(fields, name, 0.9, format)) ? f : _default ? replace_uservars(_default) : "";
-		});
-		
-		//%ref(name, format, default)%
-		html = html.replace(/%ref\(\s*([^;@)]+)(?:@([^;)]+))?(?:\s*;\s*([^)]*)\s*)\)%/ig, (m0, name, format, _default) => {
-			if (!references) return "";
-			
-			let ref_name = identityNormalize(name);
-			let value = references[ref_name];
-			
-			_default = _default && _default.replace(/<\/?\w+[^>]*?>/g,"");
-			
-			if (format && value) {
-				format = format.toLowerCase().trim();
-				switch (name) {
-					case "sei": 
-						if (format == "link") value = `<span data-cke-linksei="1" style="text-indent:0px;" contenteditable="false"><a id="lnkSei${references.protocolo}" class="ancoraSei" style="text-indent:0px;">${value}</a></span>`;
-						break;
-
-					case "ano":
-						if (format == "2") value = (value.length == 4) ? value.slice(-2) : value.substr(0,2);
-						else if (format == "4") value = (value.length == 4) ? value : (Number(value.slice(-2))<50?"20":"19") + value.slice(-2);
-						break;
-					
-					case "data":
-						if (format == "ext" && (md = value.match(/(\d{2})\/(\d{2})\/(\d{4})/))) {
-							let mes = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
-							value = `${Number(md[1])} de ${mes[Number(md[2])-1]} de ${md[3]}`;
-						}
-						break;
-						
-					default:
-						value = formatValue(value, format);				
-				}
-			}
-			
-			return value ? value : _default ? replace_uservars(_default) : "";
-		});
-		
-		//%bm(name)%
-		html = html.replace(/%bm\(\s*([^)]+)\s*\)%/ig, (m0, name) => {
-			if (!references || !references.bookmarks) return "";
-			name = identityNormalize(name);
-			let value = references.bookmarks[bm_name];
-			return value ? value : "";
+			return (f = findFieldValue(metadata.fields, name, 0.9, format)) ? f : _default ? replace_uservars(_default) : "";
 		});
 		
 		return html;
@@ -353,14 +279,17 @@ if (editor) {
 	
 	
 	//--- INÍCIO DA INTERPRETAÇÃO DO TEXTO PADRÃO
-	
+
+	//limpar marcas da edição de texto
+	html = html.replace(/(?:class="cfor-node"|spellcheck="[^"]+"|title="[^"]+")\s*/g, "");
+
 	//substituir campos e funções CFOR
 	html = parse_html(html);
 	
 	//incluir forma de tratamento de destinatário quando não definido
 	html = html.replace(/@tratamento_destinatario@/gi, (m0) => {
-		if (is_pfj(cpfj_dest) == "f") return HLText("Ao(À) Senhor(a)");
-		return HLText("Ao(À) Senhor(a) Representante Legal de");
+		if (is_pfj(metadata.dest) == "f") return hl_text("Ao(À) Senhor(a)");
+		return hl_text("Ao(À) Senhor(a) Representante Legal de");
 	});
 	
 	//apagar complemento de endereço quando não definido
@@ -370,12 +299,12 @@ if (editor) {
 	
 	//corrigir automaticamente denominação do cargo de gerência
 	html = html.replace(/O GERENTE REGIONAL DA ANATEL\s*(?=(?:<\/[^>]+>)?\s*,)/g, (m0) => {
-		return HLText("O GERENTE REGIONAL DA ANATEL NO ESTADO DO RIO GRANDE DO SUL", "yellow");
+		return hl_text("O GERENTE REGIONAL DA ANATEL NO ESTADO DO RIO GRANDE DO SUL", "yellow");
 	});
 	
 	//inserir Portaria 889 (Delegação) nos atos quando não existir
 	if (tipo_doc == "ato" && !html.match(/\bPortaria\s*?n\.?(?:\s|&\w+;)*?889\b/i)) {
-		let portaria = HLText(`CONSIDERANDO o disposto na <a data-cke-saved-href="http://www.anatel.gov.br/legislacao/portarias-de-delegacao/645-portaria-889" href="http://www.anatel.gov.br/legislacao/portarias-de-delegacao/645-portaria-889" target="_blank">
+		let portaria = hl_text(`CONSIDERANDO o disposto na <a data-cke-saved-href="http://www.anatel.gov.br/legislacao/portarias-de-delegacao/645-portaria-889" href="http://www.anatel.gov.br/legislacao/portarias-de-delegacao/645-portaria-889" target="_blank">
 		Portaria n.º&nbsp;889, de 07 de novembro de 2013</a>, que delega competências às Gerências Regionais para aprovação, expedição, adaptação, prorrogação e extinção, exceto por caducidade, de autorização para exploração de serviços de telecomunicações, e de uso de radiofrequências decorrentes, em regime privado de interesse restrito;`, "yellow");
 		
 		html = html.replace(/[\w\W]*?(<p[^>]*?>)(?=(?:\s*?<\w[^>]*?>)?\s*?CONSIDERANDO)/i, `$&${portaria}</p>$1`);
@@ -387,19 +316,51 @@ if (editor) {
 	//montar lista de variáveis a serem fornecidas pelo usuário
 	var vars = undefined;
 	
-	if (inputs) {
+	if (metadata.settings.inputs) {
 		try {
-			inputs = parse_html(inputs, {hlColor: null, emptyVar: false});
-			inputs = replace_uservars(inputs, false);
+			metadata.settings.inputs = parse_html(metadata.settings.inputs, {hlColor: null, emptyVar: false});
+			metadata.settings.inputs = replace_uservars(metadata.settings.inputs, false);
+			metadata.settings.inputs = JSON.parse(metadata.settings.inputs);
 			
-			inputs = JSON.parse(inputs);
-			
-			if (Array.isArray(inputs)) {
+			if (Array.isArray(metadata.settings.inputs)) {
 				vars = {};
-				for(let input of inputs) {
-					let type = input.type == 'choice' ? 'select' : (input.type == 'calendar' ? 'date' : input.type);
-					let list = input.type == 'choice' ? input.options : undefined;
-					vars[input.name] = {id: input.name, type: type, label: input.label, value: input.value, items: list, visibility: input.visibility};
+				for(let input of metadata.settings.inputs) {
+					vars[input.name] = {id: input.name, type: input.type, label: input.label, value: input.value, items: input.options, visibility: input.condition};
+
+					switch (input.type) {
+						case 'choice': vars[input.name].type = 'select'; break;
+
+						case 'calendar': vars[input.name].type = 'date'; break;
+
+						case 'ref':
+							vars[input.name].type = 'static';
+							vars[input.name].dropdown = {
+								button: true,
+
+								source: async function() {
+									let list = await queryNodeSei(input.options ? {type: input.options} : undefined);
+									if (!list) return [];
+									if (!Array.isArray(list)) list = [list];
+									return list.map(item => {
+										item.text = ref_to_text(item);
+										return item;
+									});
+								},
+
+								onselect:  e => {
+									let result = referenceFromData(e.data);
+									create_ref_link(result);
+									return result;
+								},
+
+								cache: true,
+								max: 7
+							};
+							vars[input.name].value = "";
+							break;
+					}
+
+
 				}
 			}
 			
@@ -435,34 +396,69 @@ if (editor) {
 		if (!vars[var_id]) vars[var_id] = {id: var_id, type: type, label: label, value: default_value, items: list};
 		return `%var(${name}${_default?";"+_default:""})%`;
 	});
+
 	
- 	(async function(html) {
+	// permitir a seleção de documento de referência nos casos quando não configurado e utilizada função $ref
+	if (!metadata.settings.reft && html.match(/\$ref\.[a-z_]\w*\b/i)) metadata.settings.reft = '?'; 
+	let prompt_ref = metadata.settings.reft && 
+					(!metadata.ref || 
+					 !metadata.ref.name ||
+   					 NodeSei.translateType(metadata.ref.name) != metadata.settings.reft ||
+   					 metadata.settings.refv);	
+	
+ 	(async function(html) {	
 		
 		//executar operações diferidas primeiro
- 		if (!html || !html.match(/%(?:var|extrato)\(.*\)%/i)) return html;
+ 		if (!html || !html.match(/%(?:var|extrato)\(.*\)%|\$[a-z_]\w*\b/i)) return html;
 		
-	 	if (vars) {
+	 	if (vars || prompt_ref) {
 			let ffs = [];
+			let ref_data = null;
+
 			for (let f in vars) if (vars.hasOwnProperty(f)) ffs.push(vars[f]);
+
+
+			if (prompt_ref) {
+				ffs.push({	id: "refDoc", 
+							type: "static", 
+							label: NodeSei.translateType(metadata.settings.reft) + ' de Referência', 
+							value: ref_to_text(metadata.ref),
+						  	dropdown: {
+								button: true,
+						  		source: async function() {
+									let list = await queryNodeSei(metadata.settings.reft ? {type: metadata.settings.reft} : undefined);
+									if (!list) return [];
+
+									if (!Array.isArray(list)) list = [list];
+									return list.map(item => {
+										item.text = ref_to_text(item);
+										return item;
+									});
+								},
+								onselect: e => {
+									ref_data = e.data;
+								},
+								cache: true,
+								max: 7
+							}});
+			}				 
+
 			
-			let data = await openFormDlg(ffs, "Campos do documento", {alwaysResolve: true, backgroundOpacity: 0, backgroundColor: "#aaa", nullable: false}).catch(err => {return null});
+			let data = await openFormDlg(ffs, "campos do documento", {alwaysResolve: true, backgroundOpacity: 0, backgroundColor: "#aaa", nullable: false}).catch(err => {return null});
 			if (!data) return html;
-			
-			for (let v in data) {
-				if (data.hasOwnProperty(v)) {
-					html = html.replace(new RegExp(`%var\\(${v}(?:@(-?\\d+,?\\d*?))?(?:;([^)]+))?\\)%`, "ig"), (m0, format, _default) => {
-						return data[v] ? formatValue(data[v], format) : (typeof data[v] == "boolean" ? data[v] : (_default ? _default : ""));
-					});
-					
-					html = html.replace(new RegExp(`\\$${v}(?:@(-?\d+(?:,-?\d+)?|[\w\*]+))?(?!\w*\s*=)`, "ig"), (m0, format) => {
-						return data[v] ? formatValue(data[v], format) : (typeof data[v] == "boolean" ? data[v] : "");
-					});					
-					
-					uservars[v]= data[v];
-				} 
+
+			for (let v of Object.keys(data)) {
+				html = html.replace(new RegExp(`%var\\(${v}(?:@([\\w.-]+))?(?:;(.+))?\\)%`, "ig"), (m0, format, _default) => data[v] ? formatValue(data[v], format) : (typeof data[v] == "boolean" ? data[v] : (_default ? _default : "")));
+				uservars[v]= data[v];
+			}
+
+			if (ref_data && ref_data.sei !== metadata.ref.sei) {
+				metadata.ref = referenceFromData(ref_data);
+				create_ref_link(metadata.ref);
+				uservars.ref = metadata.ref;
 			}
 			
-			html = replace_uservars(html, false);
+			html = replace_uservars(html);
 		} 
 		
 		html = html.replace(/%var\([^;]*?(?:;(.*))?\)%/ig, (m0, m1) => (m1?m1:""));
@@ -520,6 +516,21 @@ if (editor) {
 		
 		//aplicar condições com funções e variáveis diferidas
 		html = apply_conditions(html, false);
+
+		//executar blocos de comandos
+		html = html.replace(/(?:<p[^>]*?><code[^>]*?>{#begin\s*([^}]*?)}<\/code><\/p>([\w\W]*?)?)<p[^>]*?><code[^>]*?>{#end}<\/code><\/p>/ig, (m0, commands, content) => {
+			if (commands) {
+				commands = commands.toLowerCase().trim().replace(/\s{2,}/g, " ").split(" ");
+				for(let command of commands) {
+					switch (command) {
+						//limpar campos @@ vazios
+						case 'clear': content = content.replace(/(?:[,\-–\/\\]\s*|&ndash;\s*)?(?:CEP:\s*)?\s*@\w+@\s*(?:<br\b[^>]*>)?(?:\s*<\/p>\s*<p\b[^>]*?>)?/ig, ""); break;
+					}
+				}
+			}
+
+			return content;
+		});		
 		
 		//executar operações ternárias
 		html = html.replace(/<code[^>]*?>\s*{#\?([^?]*)\?([^:}]*)(?::([^}]*))}\s*<\/code>/gi, (m0, expr, is_true, is_false) => {
@@ -537,10 +548,10 @@ if (editor) {
 		
 		//links para boletos
 		html = html.replace(/%link_boleto\((.*?)(?:\s*;(.*?))?(?:\s*;(.*?))?\)%/ig, (m0, text, fistel, cpfj) => {
-			if (!fistel && !(fistel = findFieldValue(fields, "fistel", "num"))) fistel = "";
+			if (!fistel && !(fistel = findFieldValue(metadata.fields, "fistel", "num"))) fistel = "";
 			else fistel = validateFistel(fistel) ? fistel : "";
 			
-			if (!cpfj && !(cpfj = cpfj_int)) return cpfj = "";
+			if (!cpfj && !(cpfj = metadata.inter)) return cpfj = "";
 			else cpfj = validateCpfj(cpfj) ? cpfj.replace(/\D/g,"") : "";
 			
 			let url;

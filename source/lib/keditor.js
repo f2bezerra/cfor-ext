@@ -310,7 +310,7 @@ function open_dialog(id, title, width, height, button, fields, callback) {
 	var dlg;
 	if (dlg = document.getElementById(id)) return;
 	
-	if (!$("link[href*='dialog.css']").length) $('<link href="/sei/editor/ck/skins/moonocolor/dialog.css?t=G2FW" rel="stylesheet">').appendTo("head");	
+	if (!$("link[href*='moonocolor/dialog.css']").length) $('<link href="/sei/editor/ck/skins/moonocolor/dialog.css?t=G2FW" rel="stylesheet">').appendTo("head");	
 	
 	var left = (screen.width - width) / 2, top = (screen.height - height) / 2;
 	dlg = $(`<div id="${id}" class="cke_reset_all cke_2 cke_editor_txaConteudo_dialog" role="dialog" style="display: none;"><table class="cke_dialog cke_browser_gecko cke_ltr cke_single_page" style="position: fixed; top: ${top}px; left: ${left}px; z-index: 10010;" role="presentation"><tbody><tr><td role="presentation"><div class="cke_dialog_body" role="presentation"><div class="cke_dialog_title" role="presentation" style="-moz-user-select: none;">${title}</div><a class="cke_dialog_close_button" href="javascript:void(0)" title="Fechar" role="button" cfor-action="cancel" style="-moz-user-select: none;"><span class="cke_label">X</span></a><div class="cke_dialog_tabs" role="tablist"><a class="cke_dialog_tab cke_dialog_tab_selected" cke_first="" title="Geral" tabindex="-1" hidefocus="true" role="tab" style="-moz-user-select: none;">Geral</a></div><table class="cke_dialog_contents" role="presentation"><tbody><tr><td class="cke_dialog_contents_body" role="presentation" style="width: ${width}px; height: ${height}px;"><div role="tabpanel" class="cke_dialog_ui_vbox cke_dialog_page_contents" style="width: 100%" name="tab-source" aria-hidden="false"><table role="presentation" style="width:100%;" cellspacing="0" border="0" align="left"><tbody></tbody></table></div></td></tr><tr><td class="cke_dialog_footer" role="presentation"><table role="presentation" class="cke_dialog_ui_hbox cke_dialog_footer_buttons"><tbody><tr class="cke_dialog_ui_hbox"><td class="cke_dialog_ui_hbox_first" role="presentation"><a style="-moz-user-select: none;" href="javascript:void(0)" title="OK" hidefocus="true" class="cke_dialog_ui_button cke_dialog_ui_button_ok" role="button" cfor-action="ok"><span class="cke_dialog_ui_button">OK</span></a></td><td class="cke_dialog_ui_hbox_last" role="presentation"><a style="-moz-user-select: none;" href="javascript:void(0)" title="Cancelar" hidefocus="true" class="cke_dialog_ui_button cke_dialog_ui_button_cancel" role="button" cfor-action="cancel"><span class="cke_dialog_ui_button">Cancelar</span></a></td></tr></tbody></table></td></tr></tbody></table></div></td></tr></tbody></table></div>`);
@@ -336,7 +336,6 @@ function open_dialog(id, title, width, height, button, fields, callback) {
 			$(cke_dlg).css("left", actual_pos.x + e.screenX - start_pos.x);
 			$(cke_dlg).css("top", actual_pos.y + e.screenY - start_pos.y);
 			start_pos = {x: e.screenX, y: e.screenY};
-			console.log(start_pos);
 		}).mouseup((e) => {
 			$(document).off("mousemove mouseup");
 		});
@@ -348,20 +347,27 @@ function open_dialog(id, title, width, height, button, fields, callback) {
 	
 	let $tr, $td, first_elem;
 	for (let f of fields) {
+
+		if (f.type == 'separator') {
+			$dlg_body.append(`<tr><td class="cke_dialog_ui_separator"><label>${f.label}</label></td></tr>`);
+			continue;
+		}
 		
-		if (!f.no_br || !$tr) {
-			$tr = $("<tr />");
-			$dlg_body.append($tr);
-		}	
-		
-		$td = $('<td class="cke_dialog_ui_vbox_child"></td>');
-		$tr.append($td);
-		
-		let $div_f = $('<div></div>'); 
+		if (!f.inline || !$td) {
+			if (!f.no_br || !$tr) {
+				$tr = $("<tr />");
+				$dlg_body.append($tr);
+			}	
+			
+			$td = $('<td class="cke_dialog_ui_vbox_child"></td>');
+			$tr.append($td);
+		} 
+
+		let $div_f = $('<div class="cke_dialog_ui_field"></div>'); 
 		$td.append($div_f);
 		
 		if (f.label) {
-			$div_f.append(`<label id="${f.id}_label" class="cke_dialog_ui_labeled_label cke_required" for="${f.id}">${f.label}</label>`);
+			$div_f.append(`<label id="${f.id}_label" class="cke_dialog_ui_labeled_label cke_dialog_ui_label cke_required" for="${f.id}">${f.label}</label>`);
 			if (f.label_position == 'top') $div_f.append('<br>');
 		}
 
@@ -393,12 +399,18 @@ function open_dialog(id, title, width, height, button, fields, callback) {
 				if (f.items) {
 					f.items.split(",").forEach((item, index) => {
 						let m_opt;
-						if (m_opt = item.match(/(\w[^=]*?)=(.+)/i)) $(f.elem).append(`<option value="${m_opt[1]}">${m_opt[2]}</option>`);
+						if (m_opt = item.match(/\s*([^=]*?)\s*=(.+)/i)) $(f.elem).append(`<option value="${m_opt[1] == '_'?'':m_opt[1]}">${m_opt[2]}</option>`);
 						else $(f.elem).append(`<option value="${index}">${item}</option>`);
 					});
 					
-					if (f.value == undefined) f.value = 0;
+					if (f.value == undefined) f.elem.selectedIndex = 0;
 				}
+				break;
+
+			case "check":
+				$div_f.append('&nbsp;');
+				f.elem = $(`<input type="checkbox">`).get(0);
+				f.elem.checked = (f.value==="true"|f.value===true);
 				break;
 				
 			case "interval":	
@@ -430,7 +442,7 @@ function open_dialog(id, title, width, height, button, fields, callback) {
 			if (f.intellisense) enableIntellisense(elem, f.intellisense);
 			
 			if (!first_elem) first_elem = elem;
-			if (f.value) {
+			if (f.value != undefined) {
 				switch (f.type) {
 					case "interval": $(elem).val(Array.isArray(f.value) && index < f.value.length?f.value[index]:""); break;
 					case "edtable": f.elem.EdTable.load(f.value); break;
@@ -448,15 +460,22 @@ function open_dialog(id, title, width, height, button, fields, callback) {
 		var output = {}, fds = {};
 		
 		for (var f of fields) {
+			if (	f.type == 'separator') continue;
+
+			let fObj = Object.create(Object.prototype, {
+				elem: {writable: false, configurable: false, enumerable: false, value: f.elem}
+			});
+
+
 			switch (f.type) {
 				case "interval": 
 					output[f.id] = [$(f.elem).find("input").first().val(), $(f.elem).find("input").last().val()];
-					Object.defineProperty(f, "value", {
-						get: () => {return output[f.id]},
-						set: (v1, v2=null) => { 
+					Object.defineProperty(fObj, "value", {
+						get: function() {return [$(this.elem).find("input").first().val(), $(this.elem).find("input").last().val()]},
+						set: function(v1, v2=null) { 
 							if (!Array.isArray(v1)) v1 = [v1, v2];
-							$(f.elem).find("input").first().val(v1[0]);
-							$(f.elem).find("input").first().val(v1[1]);
+							$(this.elem).find("input").first().val(v1[0]);
+							$(this.elem).find("input").last().val(v1[1]);
 						}
 					});
 					
@@ -464,23 +483,38 @@ function open_dialog(id, title, width, height, button, fields, callback) {
 					
 				case "edtable":
 					output[f.id] = f.elem.EdTable.get();
-					Object.defineProperty(f, "value", {
-						get: () => {return f.elem.EdTable.get()},
-						set: v => {f.elem.EdTable.load(v)}
+					Object.defineProperty(fObj, "value", {
+						get: function() {return this.elem.EdTable.get()},
+						set: function(v) {this.elem.EdTable.load(v)}
 					});
 					
 					break;
+
+				case "check":
+					output[f.id] = f.elem.checked;
+					Object.defineProperty(fObj, "value", {
+						get: function() {return this.elem.checked},
+						set: function(v) {this.elem.checked = v}
+					});
+					
+					break;
+	
 					
 				default: 
 					output[f.id] = $(f.elem).val();
-					Object.defineProperty(f, "value", {
-						get: () => {return $(f.elem).val()},
-						set: v => {$(f.elem).val(v)}
+					Object.defineProperty(fObj, "value", {
+						get: function() {return $(this.elem).val()},
+						set: function(v) {$(this.elem).val(v)}
 					});
 				
 			}
-			fds[f.id] = f;
+			fds[f.id] = fObj;
 		}
+		fds.clear = function() {
+			for(let prop in this) {
+				fds[prop].value = null;
+			}
+		};
 		
 		
 		if (callback && !callback({dlg: dlg, fields: fds, action: $(event.currentTarget).attr("cfor-action"), data: output})) return;
@@ -489,6 +523,14 @@ function open_dialog(id, title, width, height, button, fields, callback) {
 	});
 	
 	$('.cke_dialog_background_cover').css("display", "block");
+	$(dlg).css("visibility", "hidden");
 	$(dlg).css("display", "block");
+
+	let $cke_dlg = $(dlg).find('.cke_dialog');
+
+	$cke_dlg.css('left', (screen.width - $cke_dlg.outerWidth(true)) / 2);
+	$cke_dlg.css('top', (screen.height - $cke_dlg.outerHeight(true)) / 2);
+	$(dlg).css("visibility", "visible");
+
 	if (first_elem) $(first_elem).focus();
 }

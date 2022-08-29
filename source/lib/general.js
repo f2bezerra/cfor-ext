@@ -2,8 +2,10 @@
 /***********************************************/
 /* Definição de compatibilidade para o Chrome  */
 /***********************************************/
-var browser = browser || chrome;
-
+try {
+	var browser	= browser || chrome;
+} catch(ex) {
+}
 
 
 /***********************************************/
@@ -117,14 +119,41 @@ if (!Number.prototype.toMoney) {
 	}
 }
 
+if (!Object.prototype.getValue) {
+	Object.defineProperty(Object.prototype, 'getValue', {
+		value : function(key) {
+			if (!key) return this;
 
-/***********************************************/
-/* Extensão do JQuery                          */
-/***********************************************/
+			if (!typeof key == 'number') return this[key];
 
-/*** Função que verifica se elementos estão dentro do Viewport ***
-		return <boolean>
-*/
+			let k;
+			let value = this;
+			let k_regex = /(?<=\.?)[a-z_]+\w*|(?<=\[)\w+(?=\])/ig;
+		
+			while (value && (k = k_regex.exec(key))) {
+				if (typeof value != 'object') return null;
+
+				if (k.index === k_regex.lastIndex) k_regex.lastIndex++;
+				value = value[k[0]];
+			}
+		
+			return value;
+		},
+		enumerable : false
+	});	
+}
+
+
+/** 
+ * Extensão do JQuery
+ * @external "jQuery.fn" 
+ */
+
+/**
+ * Função que verifica se elementos estão dentro do Viewport
+ * @method external:"jQuery.fn".isInViewport
+ * @returns {Boolean}
+ */
 $.fn.isInViewport = function() {
 	var elementTop = this[0].offsetTop;
 	var elementBottom = elementTop + $(this).outerHeight();
@@ -140,7 +169,6 @@ $.fn.isInViewport = function() {
 	
 	return ret;
 };
-
 
 
 /*** Função que define elementos como acionáveis, ou seja, exibe uma barra flutuante com ações ***
@@ -752,7 +780,8 @@ function syncAjaxRequest(url, method, data, options) {
 	if (!options) options = {};
 	
 	let default_options = {contentType: "application/x-www-form-urlencoded;",
-						   timeout: 0};
+						   timeout: 0,
+						   domParse: false};
 						   
 	for (let prop in default_options) if (default_options.hasOwnProperty(prop) && default_options[prop] !== undefined && options[prop] == undefined) options[prop] = default_options[prop];
 	
@@ -775,8 +804,13 @@ function syncAjaxRequest(url, method, data, options) {
 		let result = {status: ajax_req.status, ok: ajax_req.status == 200};
 		
 		if (result.ok) {
-			result.response = ajax_req.responseText;
-			if (result.response.substring(1, 5) == '?xml') result.response = ajax_req.responseXML;
+			if (options.domParse) {
+				let parser = new DOMParser();
+				result.response = parser.parseFromString(ajax_req.responseText.trim(), "text/html");
+			} else {
+				result.response = ajax_req.responseText;
+				if (result.response.substring(1, 5) == '?xml') result.response = ajax_req.responseXML;
+			}
 		}
 		
 		return result;
@@ -964,14 +998,6 @@ function waitDocumentReady(doc, options) {
 	
 	for (let prop in default_options) if (default_options.hasOwnProperty(prop) && default_options[prop] != undefined && options[prop] == undefined) options[prop] = default_options[prop];
 	
-/* 	var get_doc = (d) => {
-		if (d instanceof Document) return d;
-		if (typeof d == "string") {if (!(dtemp = $(d).get(0))) return d; else d = dtemp;}
-		if (d instanceof Element && d.tagName == "IFRAME" && (a = d.contentDocument || d.contentWindow.document) && (a.readyState != "uninitialized")) return a;
-		if (d instanceof Window) return d.document;
-		return d;
-	};
- */	
 	var get_doc = (d) => {
 		if (d instanceof Document) return d;
 		if (d instanceof Window) return d.document;
@@ -1010,6 +1036,24 @@ function waitDocumentReady(doc, options) {
 	});
 }
 
+
+/**
+ * Aguardar sincronamente a carga completa do documento
+ * @param {Document} doc Documento a ser aguardada a carga completa. Default: document
+ * @param {number} timeout Tempo máximo em segundos para a aconclusão da carga completa do documento. Default: 5 s
+ * @returns TRUE se completou a carga ou FALSE se houve estouro de timeout
+ */
+function syncWaitDocumentReady(doc = document, timeout = 5) {
+	const sleep = milliseconds => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds)
+	let start = new Date().getTime();
+	if (timeout) timeout *= 1000;
+
+	while (doc.readyState != "complete" && doc.readyState != "interactive") {
+		if (timeout && (new Date().getTime() - start) > timeout) return false; 
+		sleep(250);
+	}
+	return true;
+}
 
 
 /*** Calcular coeficiente Z ***
@@ -1832,6 +1876,7 @@ function parseMarkdown(text) {
 		
 	});
 	
+	text = text.replace(/^-(.*)(?:\n|$|\\n)/gm, "<ul><li>$1</li></ul>");
 	
 	text = text.replace(/\n/g, "<br>").replace(/\t/g, "");
 	
@@ -2228,10 +2273,10 @@ function openProcessDlg(title, options) {
 
 /*** Exibir janela de formulário ***
 
-		fields: lista de campos do formulário :: [<field> | <row-fields> | <group-fields> | <tab-fields>, ...]
+		fields: lista de campos do formulário :: [<field> | <row-fields> | <group-fields> | <nested-fields> | <tab-fields>, ...]
 			<field>: objeto especificador de campo :: {id, type, label, value, width, readonly, required, autofocus, shortcut, visibility, <atributos-específicos>}
 				id: identificador do campo :: <string>
-				type: tipo do campo :: (number|text|password|static|radio|check|textarea|date|select)
+				type: tipo do campo :: (number|text|password|static|radio|check|textarea|date|select|hidden|button)
 					number: tipo numérico. Atributos específicos:
 						- max: valor numérico máximo :: <number>
 						- min: valor numérico mínimo :: <number>
@@ -2244,6 +2289,7 @@ function openProcessDlg(title, options) {
 						- max: numero máximo de caracteres :: <number>
 					static: tipo estático. Atributo específico:
 						- value: texto com o conteúdo do campo estático :: <string>
+						- text: texto que é exibido no campo estático :: <string>
 					radio:  tipo radiobutton. Atributos específicos:
 						- items: lista de itens do campo :: <string, ...> | [<string, ...>]
 						- value: índice do radio selecionado :: <number>
@@ -2259,13 +2305,18 @@ function openProcessDlg(title, options) {
 						- max: data máxima :: <string> | <date>
 					select: tipo caixa de seleção. Atributo específico:
 						- items: lista de itens do campo :: <string, ...> | [<string, ...>]
+					hidden: tipo oculto
+					button: botão
+						- onclick: função para tratar click do botão 
 				label: rótulo externo de descrição do campo :: <string>
+				title: texto de ajuda do campo :: <string>
 				placeholder: rótulo interno de descrição do campo :: <string>
 				value: valor do campo :: <de acordo com o tipo>
 				width: largura do campo :: <number> | <string>
 				readonly: indica se o campo é de apenas leitura :: <boolean>
 				required: indica se o campo é obrigatório :: <boolean>
 				group: identificado do grupo de campos :: <string>
+				nest: cadeia de campos :: string
 				nobr: indica que permite o próximo campo na mesma linha :: <boolean>
 				validation: validação do campo :: <RegExp> | <string>
 				message: mensagem caso a validação falhe
@@ -2274,6 +2325,20 @@ function openProcessDlg(title, options) {
 				shortcut: configuração de tecla de atalho :: {key, callback}
 					key: identificar da tecla de atalho :: <string>
 					callback: função chamada quando a tecla de atalho é pressionada
+				dropdown: configuração da lista de seleção do campo :: {source, max, populating, class, selected}
+					button: botão de exibição do dropdown :: <boolean> | <html>
+					source: Origem dos itens a serem exibidos no dropdown :: <function> | <array> | <string_with_separator> | {url, type, key}
+						- url: endereço da informação remota
+						- type: formato: json | xml
+						- key: chave a ser exibida
+					max: Número máximo de itens exibidos no dropdown
+					class: Nome de classe CSS para customização de exibição
+					onselect: Função chamada após seleção do item
+				icons: array de icones clicáveis ou não :: [<icon>, ...]
+			<icon>: icone :: {icon, title, onclick}
+				icon: icone de exibição :: <string> | <html>
+				title: texto de ajuda
+				onclick: quando clicável, função de tratamento do click
 			<row-fields>: array de campos que serão dispostos na mesma linha :: [<field>, ...]
 			<group-fields>: grupo de campos :: {group, fields}
 				group: identificador do grupo :: <string>
@@ -2350,6 +2415,16 @@ function openFormDlg(fields, title, options, validation) {
 			if (!title_tabs[tab_id]) title_tabs[tab_id] = fields[i].text ? fields[i].text : fields[i].tab;
 			fields[i].fields.forEach(item => {item.tab = tab_id});
 			fields.splice(i, 1, ...fields[i].fields);
+		} else if (fields[i].nest && Array.isArray(fields[i].fields)) {
+			if (fields[i].fields.length) {
+				fields[i].fields[0].label = fields[i].label ?? fields[i].fields[0].label;
+				fields[i].fields[0].dropdown = fields[i].dropdown;
+			}
+			fields[i].fields.forEach((item, index) => {
+				item.nobr = item.nobr ?? (index > 0);
+				item.nest = true;
+			});
+			fields.splice(i, 1, ...fields[i].fields);
 		} else i++;
 	}
 	
@@ -2361,13 +2436,99 @@ function openFormDlg(fields, title, options, validation) {
 		return confirmMessage(fields[0].label + "?", options.title, options).then(result => {return {[fields[0].id]: result}});
 	}
 
+	//--- funções internas e classes internas
+	var get_field_value = f => {
+		
+		if (!f || f.nodata || f.type == "button") return undefined;
+		
+		let r, value = null;
+		
+		if (f.type == "radio") value = (r = f.items.find(e => e.checked)) && (r.hasAttribute("value") ?  $(r).attr('value') : f.items.indexOf(r));
+		else value = f.type=="check" ? f.elem.checked : f.type=="date" ? $(f.elem).val().replace(/(\d{4})-(\d{1,2})-(\d{1,2})/i, "$3/$2/$1") : $(f.elem).val();
+		
+		if (f.type == "text" && f.upper && value) value = value.toUpperCase();
+		
+		if (f.type == "number") value = Number(value);
+		
+		return value;
+	};
+
+	var FieldInput = function(__field) {
+		var field = __field;
+
+		Object.defineProperty(this, "value", {
+			get: function() {return get_field_value(field)},
+			set: function(v) {
+				if (!field || field.nodata || field.type == "button") return;
+
+				switch (field.type) {
+					case "radio":
+						let r;
+						if (Number.isInteger(v) && v < field.items.length) field.items[v].checked = true;
+						else if (r = field.items.find(e => e.hasAttribute("value") && $(e).attr('value') == v)) r.checked = true;
+						return;
+
+					case "check":
+						if (typeof v == 'string') v = v && (v !== 'false') ;
+						field.elem.checked = v;
+						return;
+
+					case "date":
+						if (typeof v == 'string') v = v.toDate();
+						break;
+
+					case "number":
+						v = Number(v);
+						break;
+
+					default:
+						if (field.upper) v = v.toUpperCase();
+				}
+				$(field.elem).val(v);
+				}
+		});
+
+		if (field.type == "static") {
+			Object.defineProperty(this, "text", {
+				get: function() {return $(field.elem).html()},
+				set: function(v) {$(field.elem).html(v)}
+			});
+		}
+
+		Object.defineProperty(this, "element", {
+			get: function() {return field.elem}
+		});
+	};
+
+	var clickEventHandler = function (e) {
+		let f = e.currentTarget.field;
+		let callback = f.onclick || e.currentTarget.click_callback;
+		if (!callback || typeof callback != 'function') return;
+
+		e.dlg = dlg; 
+		e.inputs = fields.reduce((m, f) => {
+			if (f.nodata || f.type == 'button') return m;
+			m[f.id] = new FieldInput(f);
+			return m;
+		}, {});
+
+		e.openDropdown = () => new Promise((resolve, reject) => {
+			let owner = e.currentTarget.closest('.form-field');
+			if (owner.dropdown) owner.dropdown.open(resolve);
+			else reject();
+		});
+
+		callback(e);
+	};
+
+
  	//--- criação do formulário
 	var doc = window.top.document;
 	var dlg = doc.createElement("div");
 	dlg.id = "div-form-dlg";
 	$(dlg).addClass("modal-dlg-form");
 	
-	let row, first_elem, last_group = undefined, container = dlg, has_field_validation = false, has_field_visibility = false;
+	let row, $divf, first_elem, last_group = undefined, container = dlg, has_field_validation = false, has_field_visibility = false, last_nest = undefined;
 	for (let f of fields) {
 		if (typeof f == "string") {
 			if (f.match(/\s*-+\s*/)) f = fields[fields.indexOf(f)] = {type: "hr"};
@@ -2379,6 +2540,13 @@ function openFormDlg(fields, title, options, validation) {
 			switch (f.type) {
 				case "hr": $(container).append("<hr>"); break;
 			}
+			continue;
+		}
+
+		if (f.type == "hidden") {
+			f.elem = $('<input type="hidden">').get(0);
+			$(f.elem).val(f.value ?? '');
+			$(container).append(f.elem); 
 			continue;
 		}
 		
@@ -2399,15 +2567,20 @@ function openFormDlg(fields, title, options, validation) {
 			$(container).append(row);
 		}
 		
-		let $divf = $('<div class="form-field" />'); 
-		$(row).append($divf);
-		
-		if (f.type == "check" && f.label && !f.text) {
-			f.text = f.label;
-			f.label = null;
-		}
-		
-		if (f.label) $divf.append(`<label for="${dlg.id}-${f.id}">${f.label}</label>`);
+		if (!f.nest || f.nest != last_nest) {
+			$divf = $('<div class="form-field" />'); 
+			$(row).append($divf);
+			
+			if (f.type == "check" && f.label && !f.text) {
+				f.text = f.label;
+				f.label = null;
+			}
+			
+			if (f.label && f.type != 'button') $divf.append(`<label for="${dlg.id}-${f.id}">${f.label}</label>`);
+			last_nest = f.nest;
+		} 
+
+		if ((f.nest || (f.dropdown && f.dropdown.button)) && !$divf.is('.form-control-nest')) $divf.append($divf = $('<div class="form-control-nest" />'));
 		
 		if (typeof f.items == "string") f.items = f.items.split(options.listSeparator);
 		
@@ -2446,7 +2619,8 @@ function openFormDlg(fields, title, options, validation) {
 
 			case "static": 
 				f.elem = $(`<span class="form-control static" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />`).get(0);
-				if (f.value) $(f.elem).text(f.value);
+				if (f.text || f.value) $(f.elem).text(f.text ?? f.value);
+				
 				break;
 				
 			case "radio":
@@ -2510,7 +2684,14 @@ function openFormDlg(fields, title, options, validation) {
 				}
 				
 				break;
+
+			case "button":
+				f.elem = $(`<button class="form-control-btn">${f.caption ?? '...'}</button>`).get(0);
+				f.elem.onclick = clickEventHandler;
+				break;
 		}
+
+		if (f.elem) f.elem.field = f;
 		
 		if (f.autofocus && !options.autofocus && f.elem) options.autofocus = f.elem; 
 
@@ -2532,7 +2713,194 @@ function openFormDlg(fields, title, options, validation) {
 				});
 			}
 
-			$divf.append(f.elem);
+			
+
+			if (f.type == 'text' && f.icons) {
+				let container = document.createElement('div');
+				container.classList.add("form-control-iconed");
+				$divf.append(container);
+
+				container.appendChild(f.elem);
+				container.appendChild(container = $('<div style="width:0;"></div>').get(0));				
+				container.appendChild(container = document.createElement('div'));				
+				container.classList.add("form-control-iconsbar");
+
+				for (let item of f.icons) {
+					let icon = document.createElement('span');
+					icon.classList.add('form-control-icon');
+					icon.field = f;
+					icon.innerHTML = item.icon ?? '...';
+					if (item.title) icon.setAttribute('title', item.title);
+					if (item.onclick) {
+						icon.click_callback = item.onclick;
+						icon.onclick = clickEventHandler;
+						icon.style.cursor = "pointer";
+					}
+					container.appendChild(icon);
+				}
+
+			} else $divf.append(f.elem);
+
+			if (f.dropdown) {
+
+				if (f.dropdown.button) {
+					let button = document.createElement('button');
+					button.classList.add("form-control-btn");
+					button.innerHTML = typeof f.dropdown.button == "string" ? f.dropdown.button : '<svg viewBox="0 0 19 20" style="width:12px;height:12px;"><path fill="currentColor" d="m3.8 6.7 5.7 5.7 5.7-5.7 1.6 1.6-7.3 7.2-7.3-7.2 1.6-1.6z"></path></svg>';
+					button.field = f;
+					$divf.append(button);
+					button.onclick = e => e.currentTarget.closest('.form-field').dropdown.open();
+				}
+
+				let dropdown_container = $divf.is('.form-control-nest') ? $divf.closest('.form-field').get(0) : $divf.get(0);
+				let $dropdown = $(`<div class="form-control-dropdown slipeDown" />`);	
+				let $ul = $('<ul />');
+
+				$dropdown.append($ul);
+
+				$(dropdown_container).append($dropdown);
+
+				dropdown_container.dropdown = new function (owner, target, settings) {
+					this.owner = owner;
+					target.owner = owner;
+					this.target = target;
+					this.settings = settings; 
+				}(dropdown_container, $dropdown.get(0), f.dropdown);
+
+				dropdown_container.dropdown.open = async function(resolve) {
+					this.settings.resolve = resolve;
+					var source = this.settings.source;
+
+					$ul = $(this.target).find('ul');
+					if (!$ul.children().length || (typeof source == 'function' && !this.settings.cache)  || (typeof source == 'object' && source.url && source.key && !this.settings.cache)) {
+						let to_wait = setTimeout(function(owner) {
+							$(owner).find('.form-control').after('<div style="width:0;display:flex;align-items:center;"><i class="form-control-loader">Loading...</i></div>');
+						}, 250, this.owner);
+
+						if (typeof source == 'function') {
+							$ul.find('li').remove();
+
+							if (source.constructor.name === "AsyncFunction" || source instanceof Promise) source = await source(this.owner);
+							else source = source(this.owner);
+						}
+
+						if (typeof source == 'object' && !Array.isArray(source)) {
+							$ul.find('li').remove();
+							let response = await fetch(source.url).then(r => {
+								if (!source.type || source.type == 'json') return r.json();
+								if (source.type === 'xml') throw new Exception('Não implementado ainda');
+								return null;
+							});
+
+							if (response) {
+								if (!Array.isArray(response)) response = [response];
+
+								source = response.map(obj => {
+									return {text: obj[source.key], data: obj};
+								});
+
+							} else source = null;
+						}
+
+						clearTimeout(to_wait);
+						$(this.owner).find('.form-control-loader').remove();
+
+						if (!source) return;
+
+						if (typeof source == 'string') source = source.split(options.listSeparator ?? ',');
+
+						if (Array.isArray(source)) {
+							for (let item of source) {
+								if (typeof item == 'string') $ul.append(`<li>${item}</li>`);
+								else {
+									let li = document.createElement('li');
+									$(li).html(item.text ?? item.toString());
+									li.data = item.data ?? item;
+									$ul.append(li);
+								}
+							}
+						}
+
+						$ul.find('li').on('mousedown', e => {
+							var target = e.currentTarget.closest('.form-control-dropdown').owner;
+							e.text = $(e.currentTarget).text();
+							e.data = e.currentTarget.data ?? null;
+	
+							let call_select = target.dropdown.settings.resolve || target.dropdown.settings.onselect;
+							let input, result;
+
+							if (call_select) {
+								e.inputs = fields.reduce((m, f) => {
+									if (f.nodata || f.type == 'button') return m;
+									m[f.id] = new FieldInput(f);
+									return m;
+								}, {});
+
+								result = call_select(e);
+							} else result = e.data;
+							
+							if (input = target.querySelector('.form-control')) {
+								if ($(input).is('input[type=text]')) {
+									$(input).val(e.text);
+									$(input).prop("data", result);
+								} else if ($(input).is('span')) {
+									$(input).text(e.text);
+									$(input).val(result);
+								}
+							}
+
+							target.dropdown.close(e);
+						});
+					}
+
+					$(this.target).css('display', 'block');
+
+					let row = $(this.target).find('li').get(0) || this.target;
+					let compStyles = window.getComputedStyle(row);
+					let lh = Number(compStyles.getPropertyValue('line-height').replace(/[^\d.]/g, '')) + 
+						 	 Number(compStyles.getPropertyValue('padding-top').replace(/[^\d.]/g, '')) +
+							 Number(compStyles.getPropertyValue('padding-bottom').replace(/[^\d.]/g, ''));
+
+					$(this.target).css('max-height', lh * (this.settings.max ? this.settings.max : 5));
+					$(this.target).css('width', $(this.owner).closest('.form-field').outerWidth());
+
+					this.target.ownerDocument.addEventListener("keydown", this.owner.dropdown.close, true);
+					this.target.ownerDocument.addEventListener("mousedown", this.owner.dropdown.close, true);
+					this.target.ownerDocument.addEventListener("blur", this.owner.dropdown.close, true);
+
+					$(this.target).addClass('dropdown-show');
+					this.target.ownerDocument.body.focus(this.target);
+				};
+
+				dropdown_container.dropdown.close = async function(e) {
+					let doc = e.currentTarget instanceof Document ? e.currentTarget : e.currentTarget.ownerDocument;
+					let target = doc.querySelector('.form-control-dropdown.dropdown-show');
+					if (!target) return;
+
+					if (e.type === 'keydown') {
+						e.preventDefault();
+						e.stopPropagation();
+						e.stopImmediatePropagation();
+					}
+			
+					target.ownerDocument.removeEventListener("keydown", target.owner.dropdown.close, true);
+					target.ownerDocument.removeEventListener("mousedown", target.owner.dropdown.close, true);
+					target.ownerDocument.removeEventListener("blur", target.owner.dropdown.close, true);
+
+					$(target).removeClass('dropdown-show');
+					$(target).css('display', '');
+				};
+
+				$dropdown.on('wheel', e => {
+					let up = ((e.originalEvent.wheelDelta && e.originalEvent.wheelDelta > 0) || e.originalEvent.deltaY < 0);
+					if ((e.currentTarget.scrollTop <= 0 && up) || (!up && e.currentTarget.scrollTop >= (e.currentTarget.scrollHeight - e.currentTarget.clientHeight))) {
+						e.preventDefault();
+						e.stopPropagation();
+						e.stopImmediatePropagation();
+					}
+				});
+			}
+
 			if (f.text) if (f.type == "check") $divf.append(`<span>${f.text}</span>`); else $divf.append(f.text);
 			if (f.value != undefined) $(f.elem).val(f.value);
 		}
@@ -2551,24 +2919,6 @@ function openFormDlg(fields, title, options, validation) {
 	
 	options.validation = validation;
 	options.defaultButton = options.confirmButton;
-	
-	let get_field_value = f => {
-		
-		if (!f || f.nodata) return undefined;
-		
-		let r, value = null;
-		
-		if (f.type == "radio") value = (r = f.items.find(e => e.checked)) && (r.hasAttribute("value") ?  $(r).attr('value') : f.items.indexOf(r));
-		else value = f.type=="check" ? f.elem.checked : f.type=="date" ? $(f.elem).val().replace(/(\d{4})-(\d{1,2})-(\d{1,2})/i, "$3/$2/$1") : $(f.elem).val();
-		
-		if (f.type == "text" && f.upper && value) value = value.toUpperCase();
-		
-		if (f.type == "number") value = Number(value);
-		
-		return value;
-	}
-	
-	
 	
 	if (has_field_visibility) {
 		var fields_map = fields.reduce((m, f) => (m[f.id] = f, m), {});
@@ -2979,6 +3329,7 @@ function openPopupList(target, options) {
 				<boolean>: insere um botão com uma seta pra baixo após o elemento contralador
 				<string>: atribui uma classe ao botão extra para definir um símbolo diferente
 			rtl: exibir menu alinhado à direita
+			dropButtonTitle: dica para o botão extra de controle :: <string>
 		callback: função chamada quando um item do menu é clicado :: function({originalEvent, id, text})
 		
 		return <menu>
@@ -3019,6 +3370,7 @@ function createPopupMenu(controler, items, options, callback) {
 			$ul.append(`<li>${item}</li>`);
 		} else {
 			let $li = $(`<li><a href="javascript:void(0);">${item.text}</a></li>`);
+			$li.find('a').get(0).data = item.data;
 
 			if (item.id) $li.find('a').first().attr('item-id', item.id);
 
@@ -3110,6 +3462,7 @@ function createPopupMenu(controler, items, options, callback) {
 				var $btn = $('<button class="btn-dropdown">&nbsp;</button>');
 				if (typeof options.dropButton == "string") $btn.addClass(options.dropButton);
 				else $btn.html('<span class="btn-caret"></span>');
+				if (options.dropButtonTitle) $btn.attr('title', options.dropButtonTitle);
 				$(controler).after($btn);
 				reference = $btn;
 			}
@@ -3160,7 +3513,7 @@ function createPopupMenu(controler, items, options, callback) {
 			open_submenu(e);
 		} else {
 			menu.close();
-			if (callback) callback.call(e.currentTarget, {originalEvent: e, id: id, text: $(e.currentTarget).text()});
+			if (callback) callback.call(e.currentTarget, {originalEvent: e, id: id, text: $(e.currentTarget).text(), data: e.currentTarget.data});
 		}
 		
 	});
@@ -3173,6 +3526,196 @@ function createPopupMenu(controler, items, options, callback) {
 	});		
 	
 	return menu;
+}
+
+
+/*** Exibir lista de multiseleção
+
+		target: elemento que receberá a lista suspensa :: <element>
+		options: opções de exibição da lista suspensa :: {list, listSeparator, classItem, sortList, onSelect} | [<item>, ...]
+			list: array de items da lista suspensa :: [<item>, ...]
+				<item>: objeto identificador de item da lista suspensa :: {text, desc, value, class}
+					- text: texto exibido na lista :: <string>
+					- desc: texto de descrição do item da lista :: <string>
+					- value: valor do item da lista :: <object>
+					- class: classe de customização do item da lista :: <string>
+			listSeparator: caracter utilizado como separador para listas em string. Padrão ',' :: <string>
+			classItem: classe padrão de customização do sitens da lista :: <string>
+			sortList: ordenar lista. Padrão true :: <boolean>
+			onSelect: função chamada quando se faz uma seleção no elemento alvo :: function({token, value, range})
+*/
+function createMultiSelector(options) {
+	if (!options) throw "Argumentos não definidos";
+	
+	if (Array.isArray(options) || typeof options == "string") options = {list: options};
+	
+	if (!options.list) throw "Lista não informada";
+
+	
+	let default_options = {list: undefined, 		// array de string o Map (key,value)
+						   listSeparator: ",",		// separador para listas em string
+						   classItem: undefined,	// classe padrão para itens da lista
+						   sortList: true,			// ordenar lista	
+						   onSelect: undefined};  	// function({token, value, range})
+						   
+	for (let prop in default_options) if (default_options.hasOwnProperty(prop) && default_options[prop] && options[prop] == undefined) options[prop] = default_options[prop];
+	
+	var keydown_callback;
+
+	options.list = convertListOptions(options.list);
+	if (!options.list) throw "Lista vazia";
+
+	var popup = $(`<div class="popup-list slipDown" style="z-index: 50001; position: absolute; opacity: 1; overflow-y: auto; display: none;" role="presentation">
+						<div class="popup-panel">
+							<div style="margin: 0px; padding: 0px; -moz-user-select: none;">
+								<div class="popup-block" tabindex="-1" role="listbox"></div>
+							</div>
+						</div>
+				   </div>`).get(0);
+	var external_resolve;
+						
+	let $ul;
+	for (let item of options.list) {
+		if (!$ul) {
+			$ul = $('<ul role="presentation"></ul>');
+			$(popup).find('.popup-block').append($ul);
+		}
+		
+		let $li = $(`<li role="presentation">
+						<input type="checkbox" value="${item.key ?? item.value}" role="option" />
+						<label> ${item.value}</label>
+					</li>`);
+				
+		if (options.classItem) $li.addClass(options.classItem);
+		$ul.append($li);
+	}
+		
+	if (options.sortList) {
+		$lis = $ul.children('li');
+		$lis.detach().sort(function(a, b) {
+			a = $(a).text();
+			b = $(b).text();
+			return (a.toString() > b.toString()) ? (a.toString() > b.toString()) ? 1 : 0 : -1;
+		});
+		$ul.append($lis);
+	}
+
+	//tratar evento keydown
+	keydown_callback = function(e) {
+		switch (e.key) {
+			case "ArrowRight":
+			case "ArrowLeft": {
+				e.preventDefault();
+				e.stopPropagation();
+				e.stopImmediatePropagation();
+				popup.close();
+				break;
+			}
+			
+			case "ArrowDown":
+				e.preventDefault();
+				e.stopPropagation();
+				let $next = $(popup).find("li.li-selected").next(":visible");
+				if ($next.length) {
+					$(popup).find("li.li-selected").removeClass("li-selected");
+					$next.addClass("li-selected");
+					if (!$next.isInViewport()) $next.get(0).scrollIntoView(false);
+				}
+				break;
+				
+			case "ArrowUp":
+				e.preventDefault();
+				e.stopPropagation();
+				let $prev = $(popup).find("li.li-selected").prev(":visible");
+				if ($prev.length) {
+					$(popup).find("li.li-selected").removeClass("li-selected");
+					$prev.addClass("li-selected");
+					if (!$prev.isInViewport()) $prev.get(0).scrollIntoView();
+				}
+				break;
+				
+			case "Enter":
+				if ($(popup).is(":visible")) {
+					popup.close(true);
+					return;
+				}
+				break;
+
+				case "Space":
+				case "Tab":
+				case "Escape": popup.close(); break;
+		
+			default:
+				e.preventDefault();
+				e.stopPropagation();
+		}
+	};
+
+
+	popup.open = function(position, values) {
+		popup.state = 'opened';
+
+		return new Promise(resolve => {
+			var doc;
+			if (position instanceof Element) {
+				doc = position.ownerDocument;
+
+				let rect = position.getBoundingClientRect();
+				let offset = window.length ? $(window.frames[0].frameElement).offset() : {left: 0, top: 0};
+				var container = position.parentElement;
+				var line_height = (styles = window.getComputedStyle(container)) && (fs = styles.getPropertyValue('font-size')) ? line_height = (Number(fs.replace(/\D/g, '')) * 0.75) : 10;
+
+				position = {top: offset.top + rect.top + window.scrollY, left: offset.left + rect.left + 1};
+			} else doc = document;
+
+			doc.body.append(popup);
+			if (values) {
+				if (typeof values == "string") values = values.split(",").map(item => item.trim());
+				$(popup).find('input[type=checkbox]').each((index, item) => {
+					$(item).prop('checked', values.includes($(item).val()));
+				});
+			} else $(popup).find('input[type=checkbox]').prop('checked', false);
+
+			$(popup).css("left", position.left).css("top", position.top).find("li:first").addClass("li-selected");
+			doc.addEventListener("keydown", keydown_callback, true);
+			for (var i = 0; i < top.window.parent.frames.length; i++) $(top.window.parent.frames[i].document).on('keydown', keydown_callback);
+			$(popup).css("display", "block").focus();
+			external_resolve = resolve;
+		});
+	};
+		
+	
+	popup.close = function(e) {
+		if (popup.state == 'closed') return;
+
+		var doc = popup.ownerDocument;
+		$(popup).css("display", "none");
+		for (var i = 0; i < top.window.parent.frames.length; i++) $(top.window.parent.frames[i].document).off('keydown', keydown_callback);
+		doc.removeEventListener("keydown", keydown_callback, true);
+
+		if (e === true) {
+			external_resolve($(popup).find('input[type=checkbox]:checked').get().map(item => $(item).val()));
+		} else external_resolve(false);
+
+		$(popup).remove();
+		popup.state = 'closed';
+	};
+
+	return popup;
+}
+
+
+/**
+ * Converte string em Array ou Map 
+ * @param {(String|Map|Array)} list 
+ * @returns Array(key,value)
+ */
+function convertListOptions(list) {
+	if (typeof list == "string") list = list.split(",");
+	if (Array.isArray(list)) return list.map(item => {
+		if (item.indexOf("=") != -1 && (item = item.split("="))) return {key: item[0], value: item[1]};
+		else return {value: item};
+	});
 }
 
 
@@ -3310,7 +3853,93 @@ function identityNormalize(id) {
 }
 
 
-		
+/** Converter XML Document em Objeto Javascript
+ * 
+ * @param {*} xmlNode Documento XML ou string
+ * @returns Object
+ */
+function JSOFromXml(xmlNode) {
+    try {
+        if (typeof(xmlNode) == 'string') {
+          xmlNode = xmlNode.replaceAll('&lt;', '<').replaceAll('&gt;', '>');
+          let parser = new DOMParser();
+          xmlNode = parser.parseFromString(xmlNode, 'application/xml');
+        }
+
+        var obj = {};
+
+        if (xmlNode.children.length == 1 && !xmlNode.parentNode) xmlNode = xmlNode.firstChild;
+
+        if (xmlNode.hasAttributes()) {
+            for(let attr of xmlNode.attributes) obj[attr.name] = attr.value;
+        }
+
+        if (!xmlNode.children.length) {
+            let value = xmlNode.textContent;
+            if (value == 'true' || value == 'false') value = value == 'true';
+            if (typeof(value) == 'string' && !isNaN(parseFloat(value))) value = Number(value);
+            
+            return value;
+        }
+
+        for (let node of xmlNode.children) {
+            if (typeof (obj[node.nodeName]) == "undefined") obj[node.nodeName] = JSOFromXml(node);
+            else {
+              if (typeof (obj[node.nodeName].push) == "undefined") {
+                  var old = obj[node.nodeName];
+                  obj[node.nodeName] = [];
+                  obj[node.nodeName].push(old);
+              }
+              obj[node.nodeName].push(JSOFromXml(node));
+            }
+        }
+
+        return obj;
+    } catch (e) {
+        console.log(e.message);
+    }
+}
+
+
+
+/** Converter metadata-string para javascript object
+ * 
+ * @param {*} data 
+ * @param {*} prefix 
+ * @returns Javascript Object
+ */
+function parseMetadata(data, prefix = '') {
+
+	let block = new RegExp(`#${prefix}BEGIN;[\\w\\W]*#${prefix}END;`, 'i');
+    if (!block.test(data)) return null;
+
+    let m, result = {};
+    const regex = /(?<=^\s*|;\s*)#([^:;]+):([\w\W]*?)(?=;\s*#)/g;
+
+    while (m = regex.exec(data)) {
+        if (m.index === regex.lastIndex) regex.lastIndex++;
+
+        let value = m[2];
+        if (value == 'true' || value == 'false') value = value == 'true';
+        if (typeof(value) == 'string' && !isNaN(parseFloat(value))) value = Number(value);
+
+        if (m[1].indexOf('.') == -1) result[m[1]] = value;
+        else {
+            let k, keys = m[1].split('.');
+            let node = result;
+            while (k = keys.shift()) {
+                if (!keys.length) node[k] = value;
+                else if (node[k]) node = node[k];
+                else node = node[k] = {};
+            }
+        }
+    }
+    
+    return result;
+}
+
+
+	
 /*** Resolvedor de expressão ***
 		
 		expr: expressão a ser resolvida
@@ -3325,8 +3954,9 @@ function solve(expr, undef, vars = null, unescape = true) {
 	if (!isNaN(expr)) return Number(expr);
 	if (expr.match(/^\s*NULL\s*$/i)) return null;
 	
-	var s, s2, value;
+	var s, q, s2, value;
 	
+	//escapar expressão
 	if (unescape) {
 		expr = expr.replace(/<(\w+)[^>]*?>(.*)<\/\1>/g,"$2").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").trim(); 
 		expr = " " + $('<textarea />').html(expr).text() + " ";
@@ -3336,47 +3966,25 @@ function solve(expr, undef, vars = null, unescape = true) {
 	if (typeof undef == "string") undef = new RegExp(undef, "i");
 	if (vars === true) vars = {};
 	
-	if (vars && (s = expr.match(/^\s*\$(_*?[a-z][\w_]*)\s*$/i))) {
-		value = vars[s[1]]; 
-		if (value != undefined) {
-			if (Array.isArray(value)) return value.length;
-			if (isNaN(value)) return " " + value;
-			return value;
-		}
-		
-		if (undef && undef.test(expr)) return undefined;
-		return "";
-	}
-	
-	if (vars && (s = expr.match(/^\s*\$(_*?[a-z][\w_]*)\s*=\s*(\(?.*\)?)\s*(?=(?<=\))\s*(?:&&|\|\||))/i))) {
-	
-		value = solve(s[2], undef, vars, unescape);
-		
-		if (value === undefined) return undefined;
-		vars[s[1]] = value;
-		if (Array.isArray(value)) return value = value.length;
-		
-		expr = " " + value + " " + expr.slice(s[0].length);
-	}
-	
+	//aplicar operadores lógicos de encadeamento && e ||
 	while ((s = expr.match(/^\s*(!)?\s*\(((?:[^()]*|\((?:[^()]*|\([^()]*\))*\))*)\)|^(.*?)\s(\|\||&&)\s/i)) && !(undef && undef.test(s[3]))) {
-		if (s[3] != undefined) {
+		if (s[3] !== undefined) {
 			let result = solve(s[3], undef, vars, unescape);
 			if (result === undefined) return undefined;
 			
 			if (s[4] == "&&") {
 				if (!result) return result;
-				if (Array.isArray(result) && !result.length) return 0;
+				if (Array.isArray(result) && !result.length) return false;
 				expr = " " + expr.slice(s[0].length);	
 			} else {
-				if (result) return result;
-				if (Array.isArray(result) && result.length) return result.length;
+				if (result && (!Array.isArray(result) || result.length)) return result;
 				expr = " " + expr.slice(s[0].length);	
 			}
 			
 		} else {
 			let result = solve(s[2], undef, vars, unescape);
-			if (result == undefined) return undefined;
+			if (result === undefined) return undefined;
+			if (result && typeof result == 'object') return result;
 			expr = (s[1]?s[1]:"") + " " + result + " " + expr.slice(s[0].length);
 		}
 	}
@@ -3384,29 +3992,101 @@ function solve(expr, undef, vars = null, unescape = true) {
 	if (undef && undef.test(expr)) return undefined;
 	
 	expr = expr.replace(/\t+/g," ").trim();
-	
-	if (vars && (s = expr.match(/^\s*\$(_*?[a-z][\w_]*)\s*=\s*([^=].*?)\s*$/i))) {
-	
-		if (s2 = s[2].match(/^\s*\$([a-z][\w_]*)\s*$/i)) value = vars[s2[1]]; 
-		else value = solve(s[2], undef, vars, unescape);
+
+	//recuperar valor de variável
+	if (vars && (s = expr.match(/^\s*\$(_*?[a-z][\w_]*)((?:\.[a-z_]+\w*|\[.*?\])+)*\s*$/i))) {
+		value = vars[s[1]]; 
 		
-		if (value === undefined) return undefined;
-		vars[s[1]] = value;
-		if (Array.isArray(value)) return value.length;
-		return value;
+		if (s[2]) {
+			let ref_regex = /\.([a-z_]+\w*)|\[(.*?)\]/ig;
+
+			while (q = ref_regex.exec(s[2])) {
+				if (q.index === ref_regex.lastIndex) ref_regex.lastIndex++;
+				if (q[1]) {
+					if (typeof value != 'object' || Array.isArray(value)) return null;
+					if (!(value = value[q[1]])) return value; 
+				} else if (q[2]) {
+					if (!Array.isArray(value)) return null;
+					let index = solve(q[2], undef, vars, unescape);
+					if (typeof index == 'number' && index < value.length) value = value[index];
+					else return null;
+				}
+			}			
+		}
+
+		if (value !== undefined) return value;
+		
+		if (undef && undef.test(expr)) return undefined;
+		return "";
 	}
 	
-	if (s = expr.match(/^\s*(["'])?(.*?)\1\s+IN\s+\[\s*(.*)\s*\]\s*$/i)) return s[3].split(",").includes(s[2]);
+	//atribuir valor para variável
+	if (vars && (s = expr.match(/^\s*\$([a-z_]+\w*)((?:\.[a-z_]+\w*|\[.*?\])+)*\s*=\s*([^=].*?)\s*$/i))) {
+	
+		value = solve(s[3], undef, vars, unescape);
+
+		if (s[2]) {
+			let ref_regex = /\.([a-z_]+\w*)|\[(.*?)\]/ig;
+			let keys = [s[1]];
+
+			while (q = ref_regex.exec(s[2])) {
+				if (q.index === ref_regex.lastIndex) ref_regex.lastIndex++;
+				if (q[1]) keys.push(q[1]);
+				else keys.push(Number(q[2]));
+			}			
+
+			let key = keys.pop();
+			let ref = vars;
+
+			for (let k of keys) {
+				if (typeof ref != 'object') break;
+				if (typeof k == 'number') {
+					if (!Array.isArray(ref) || k >= ref.length) return null;
+				} else if (ref[k] === undefined) ref[k] = {};
+				ref = ref[k];
+			}
+
+			if (typeof ref == 'object') ref[key] = value;
+			else return null;
+		} else vars[s[1]] = value;
 		
-	if (s = expr.match(/^\s*(["'])?(.*?)\1\s+([!<>*^$=]=|[<>+-])\s+["']?(.*)["']?\s*$/)) {
-		switch (s[3].toLowerCase()) {
-			case "^=": return (new RegExp(`^${s[4]}`, "i")).test(s[2]);
-			case "*=": return (new RegExp(`${s[4]}`, "i")).test(s[2]);
-			case "$=": return (new RegExp(`${s[4]}$`, "i")).test(s[2]);
+		return value;
+	}
+
+	//criar array
+	if (s = expr.match(/^\s*\[.*\]\s*$/i)) {
+		let result = [], arr_regex = /(?<=^\s*\[.*)\s*(?:\"[^"]*?"|'[^']*?'|\[.*?\](?=,|}|])|\{.*?\}(?=,|}|])|[^,]+)(?=.*\]\s*$)/ig;
+		while (s = arr_regex.exec(expr)) {
+			if (s.index === arr_regex.lastIndex) arr_regex.lastIndex++;
+			if (s[0]) result.push(solve(s[0], undef, vars, unescape));
+		}
+		return result;
+	}
+
+	//criar objeto
+	if (s = expr.match(/^\s*\{.*\}\s*$/i)) {
+		let result = {}, obj_regex = /(?<=^\s*{.*)(?:\s*(["'])?([a-z_]+\w*?)\1\s*:\s*)("[^"]*?"|'[^']*?'|\[.*?\](?=,|}|])|\{.*?\}(?=,|}|])|[^,]+)(?=.*}\s*$)/ig;
+		while (s = obj_regex.exec(expr)) {
+			if (s.index === obj_regex.lastIndex) obj_regex.lastIndex++;
+			result[s[2]] = solve(s[3], undef, vars, unescape);
+		}
+
+		return result;
+	}
+
+	//aplicar operador IN
+	if (s = expr.match(/^\s*(["'])?(.*?)\1\s+IN\s+\[\s*(.*)\s*\]\s*$/i)) return s[3].split(",").includes(s[2]);
+			
+	//aplicar operadores de comparação e aritméticos
+	if (s = expr.match(/^\s*(.*?)\s+([!<>*^$=]=|[<>+\-*\/])\s+(.*)\s*$/)) {
+		switch (s[2].toLowerCase()) {
+			case "^=": return (new RegExp(`^${s[3]}`, "i")).test(s[2]);
+			case "*=": return (new RegExp(`${s[3]}`, "i")).test(s[2]);
+			case "$=": return (new RegExp(`${s[3]}$`, "i")).test(s[2]);
 		}
 		
-		let op1 = solve(s[2], undef, vars, unescape);
-		let op2 = solve(s[4], undef, vars, unescape);
+		let op1 = solve(s[1], undef, vars, unescape);
+		let op2 = solve(s[3], undef, vars, unescape);
 		
 		if (op1 === undefined || op2 === undefined) return undefined;
 		
@@ -3418,7 +4098,7 @@ function solve(expr, undef, vars = null, unescape = true) {
 		
 		let op1_date, op2_date;
 		
-		switch (s[3].toLowerCase()) {
+		switch (s[2].toLowerCase()) {
 			case "==": {
 				if (op1_date = op1.toString().toDate()) {
 					if (!isNaN(op2) && op2 >= 1970 && op2 <= 9999) return op1_date.getFullYear() == op2;
@@ -3470,7 +4150,7 @@ function solve(expr, undef, vars = null, unescape = true) {
 			case "+": {
 				if (op2_date = op2.toString().toDate()) return op1.toString().concat(op2.toString());
 				if (op1_date = op1.toString().toDate()) return op1_date.addDate(op2).toDateBR();
-				return isNaN(op1) || isNaN(op2) ? op1.toString().concat(op2.toString()) : Number(op1) + Number(op2);
+				return op1 + op2;
 			} 
 			
 			case "-": {
@@ -3481,14 +4161,47 @@ function solve(expr, undef, vars = null, unescape = true) {
 
 				if (op1_date && op2_date) return op1_date.diffDays(op2_date);
 				if (op1_date) return op1_date.addDate("-" + op2).toDateBR();
-				return isNaN(op1) || isNaN(op2) ? s[0] : Number(op1) - Number(op2);
+				return typeof op1 == "number" && typeof op2 == "number" ? op1 - op2 : op1 + "-" + op2;
+			} 
+
+			case "*": {
+				if (op2_date = op2.toString().toDate()) return null;
+				if (op1_date = op1.toString().toDate()) return null;
+				return typeof op1 == "number" && typeof op2 == "number" ? op1 * op2 : null;
+			} 
+
+			case "/": {
+				if (op2_date = op2.toString().toDate()) return null;
+				if (op1_date = op1.toString().toDate()) return null;
+				return typeof op1 == "number" && typeof op2 == "number" && op2 != 0 ? op1 / op2 : null;
 			} 
 		}
 	};
 	
+	if (s = expr.match(/^\s*(["'])(.*)\1\s*$/i)) return s[2];
 	if (s = expr.match(/^(!)?\s*(\d)$/i)) return s[1] ? Boolean(!Number(s[2])) : Number(s[2]);
 	if (s = expr.match(/^(!)?\s*(true|false)\s*$/i)) return s[1]?s[2].toLowerCase() == 'false':s[2].toLowerCase() == 'true';
 	if (!isNaN(expr)) return Number(expr);
 
 	return expr.match(/^\s*!\s*[^\s].*$/i) ? false : expr;
 };
+
+
+
+/**
+ *  Interpretar e testar expressão 
+ * @param {String} expression Expressão a ser testada
+ * @param {(String|Regexp)} [undefineRegex] Expressão regular para defini
+ * @param {(Boolean|Object)} [variables] Objeto qu e armazena variáveis para testes em sequência
+ * @results {Boolean} Resultado a interpretação da expressão
+ */
+function testExpression(expression, undefineRegex, variables = null) {
+	let result = solve(expression, undefineRegex, variables, true);
+
+	if (result === undefined) return undefined;
+	if (!result) return false;
+	if (Array.isArray(result)) return result.length > 0;
+	if (typeof result == 'number') return result != 0;
+	if (typeof result == 'string') return result.trim().length != 0;
+	return Boolean(result);
+}

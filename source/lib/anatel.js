@@ -1043,3 +1043,22 @@ async function autorizarRA(cpf, processo) {
 		return {fistel: fistel, indicativo: indicativo};
 	});
 }
+
+//--- Consulta informações de Serviço de Telecomunicações
+function consultarServicoTelecom(cod) {
+	cod = ("000" + (cod ?? '')).slice(-3);
+	switch (parseInt(cod)) {
+		case 19: return {cod: cod, desc: "Serviço Limitado Privado", servico: "Limitado Privado", sigla: "SLP"};
+		case 251: return {cod: cod, desc: "Serviço Auxiliar de Radiodifusão e Correlatos, submodalidade Ligação para Transmissão de Programas", servico: "SARC(251)", sigla: "SARC"};
+		case 252: return {cod: cod, desc: "Serviço Auxiliar de Radiodifusão e Correlatos, submodalidade Reportagem Externa", servico: "SARC(252)", sigla: "SARC"};
+		case 253: return {cod: cod, desc: "Serviço Auxiliar de Radiodifusão e Correlatos, submodalidade Comunicação de Ordens Internas", servico: "SARC(253)", sigla: "SARC"};
+		case 254: return {cod: cod, desc: "Serviço Auxiliar de Radiodifusão e Correlatos, submodalidade Telecomando", servico: "SARC(254)", sigla: "SARC"};
+		case 255: return {cod: cod, desc: "Serviço Auxiliar de Radiodifusão e Correlatos, submodalidade Telemedição", servico: "SARC(255)", sigla: "SARC"};
+		case 302: return {cod: cod, desc: "Serviço de Radioamador", servico: "Radioamador", sigla: "RA"};
+		case 400: return {cod: cod, desc: "Serviço Rádio do Cidadão", servico: "Rádio do Cidadão", sigla: "PX"};
+		case 507: return {cod: cod, desc: "Serviço Limitado Móvel Aeronáutico", servico: "Limitado Móvel Aeronáutico", sigla: "SLMA"};
+		case 604: return {cod: cod, desc: "Serviço Limitado Móvel Marítimo", servico: "Limitado Móvel Marítimo", sigla: "SLMM"};
+	}
+
+	return {};
+}

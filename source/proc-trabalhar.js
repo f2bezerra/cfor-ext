@@ -106,13 +106,28 @@ document.getElementById("ifrVisualizacao").addEventListener("load", function() {
 		
 		//Inserir código aqui para pré-selecionar texto padrão
 		if (predata.txtpad != undefined) {
-			$selTxtPad = $(docV).find("#selTextoPadrao");
-			if (typeof predata.txtpad != 'number') {
-				if (predata.txtpad = $selTxtPad.find('option').toArray().find((item) => {return $(item).text() == predata.txtpad})) predata.txtpad = $(predata.txtpad).attr("value");
-				else predata.txtpad = 0;
+			let txtPadrao, idTxtPadrao; 
+			if (txtPadrao = docV.querySelector("#selTextoPadrao")) {
+				if (typeof predata.txtpad != 'number') {
+					if (predata.txtpad = $(txtPadrao).find('option').toArray().find((item) => {return $(item).text() == predata.txtpad})) predata.txtpad = $(predata.txtpad).attr("value");
+					else predata.txtpad = 0;
+				}
+					
+			} else if (txtPadrao = docV.querySelector("#txtTextoPadrao")) {
+				let url, script = $(docV).find('script:contains("inicializar()")').text();
+				url = script && (url = script.match(/controlador\.php\?acao=texto_padrao_interno_selecionar[^'"]+/)) && absoluteUrl(url[0]);
+
+				let result = syncAjaxRequest(url, 'GET');
+				if (result && result.ok) {
+					idTxtPadrao = (idTxtPadrao = result.response.match(new RegExp(`<input\\s[^>]+(?:title=['"]${predata.txtpad}['"][^>]+value=['"](\\d+)['"]|value=['"](\\d+)['"][^>]+title=['"]${predata.txtpad}['"])`, "i"))) &&
+								  (idTxtPadrao[1] || idTxtPadrao[2]);
+				}
 			}
-				
-			$selTxtPad.val(predata.txtpad);
+
+			if (txtPadrao) {
+				$(txtPadrao).val(predata.txtpad);
+				if (idTxtPadrao) $(docV).find('#hdnIdTextoPadrao').val(idTxtPadrao);
+			}
 		}
 	}
 	

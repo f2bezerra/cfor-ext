@@ -6,7 +6,7 @@
 
 $(function() {
 	$('#frmTextoPadraoInternoCadastro').on("submit",function(e) {
-		var ifr = document.querySelector("#cke_2_contents iframe");
+		var ifr = document.querySelector("#cke_2_contents iframe") || document.querySelector("#cke_1_contents iframe");
 		var doc = ifr.contentDocument || ifr.contentWindow.document;
 		
 		$(doc).find('code').each((index, code) => $(code).text($(code).text()));
@@ -14,6 +14,7 @@ $(function() {
 		var html = doc.body.innerHTML;
 		
 		html = html.replace(/<p[^>]*>%INIT\([\w\W]*?%<\/p>/ig,"");
+		html = html.replace(/<p[^>]*>\s*#CFOR-MD-BEGIN;[\w\W]*#CFOR-MD-END;\s*<\/p>/ig,"");
 			
 		if (html.match(/%(?:\s|&nbsp;)*?[\w_]+(?:@.+|\([^)]*?\))?(?:\s|&nbsp;)*?%|{#(?:if|else|endif|\?)\b[^}]*?}/i)) {
 			let trim_fn = function (src) {
@@ -36,15 +37,31 @@ $(function() {
 		
 		html = html.replace(/<span>([\w\W]*?)<\/span>/ig, "$1"); //Excluir todos spans vazios
 		
-		let str_init = "%INIT(@tipo_processo@,@especificacao_processo@,@cpf_interessado@,@cnpj_interessado@,@cpf_destinatario@,@cnpj_destinatario@)%";
-		if (html.match(/%field\([^)]+\)%|\$\w+/i)) str_init += "%FIELDS(@observacao_processo@)%";
-		if (html.match(/%ref\([^)]+\)%/i)) str_init += "%REFS(@observacao_documento@)%";
-		if (doc.body.varInputs) {
-			let inputs = JSON.stringify(doc.body.varInputs).replace(/(?<=\s*{|\s*,)\s*"([^"]+)"\s*:\s*/g, "$1:");
-			str_init += `%INPUTS(${inputs})%`;
-		}
+		//Conversão das configuração do texto padrão
+		let settings = {inputs: '', reft: '', refv: 'false'};
+		if (doc.body.cforSettings) {
+			settings = doc.body.cforSettings;
+			settings.inputs = settings.inputs ? JSON.stringify(settings.inputs) : '';
+			settings.refv = settings.refv ? 'true' : 'false';
+		} 
 
-		html = `<p style="display: none;">${str_init}</p>` + html;
+		let cfor_metadata = `
+		#CFOR-MD-BEGIN;
+			#version:2;
+			#proc:@tipo_processo@;
+			#spec:@especificacao_processo@;
+			#inter:@cpf_interessado@@cnpj_interessado@;
+			#dest:@cpf_destinatario@@cnpj_destinatario@;
+			#fields:@observacao_processo@;
+			#ref:@observacao_documento@;
+			#settings.reft:${settings.reft};
+			#settings.refv:${settings.refv};
+			#settings.inputs:${settings.inputs};
+		#CFOR-MD-END;
+		`;
+
+
+		html = `<p style="display: none;">${cfor_metadata.replaceAll('<', '&lt;').replaceAll('>', '&gt;')}</p>` + html;
 
 		$(doc.body).html(html);
 	});
@@ -52,8 +69,9 @@ $(function() {
 	if (!document.getElementById("ancAjudaCfor")) {
 		var $last_col = $('#frmTextoPadraoInternoCadastro table tbody tr td:last-child');
 		var a = $('<a id="ancAjudaCfor" title="Ajuda da extensão CFOR" tabindex="504"> <img class="infraImg"></a>');
+		$last_col.prev().css('width', '100%');
 		$last_col.append('<br>').append(a);
-		$("#ancAjudaCfor img").attr("src", browser.runtime.getURL("assets/logo-48.png"));
+		$("#ancAjudaCfor img").attr("src", browser.runtime.getURL("assets/logo-24.png"));
 		$("#ancAjudaCfor").on("click", function (e) {
 			chrome.runtime.sendMessage({action: "popup", url: browser.runtime.getURL("doc/txtpadrao-ajuda.html"), options: {width: 1000, height: 600}});
 		});  
@@ -61,18 +79,24 @@ $(function() {
 
 	var hs = setInterval(function() {
 
-		var doc = (ifr = document.querySelector("#cke_2_contents iframe")) && (ifr.contentDocument || ifr.contentWindow.document);
+		var doc = (ifr = document.querySelector("#cke_2_contents iframe") || document.querySelector("#cke_1_contents iframe")) && (ifr.contentDocument || ifr.contentWindow.document);
 		
-		if (!(main_toolbox = document.getElementById("cke_2_toolbox")) || !doc || doc.readyState != "complete") return;
+		if (!(main_toolbox = document.getElementById("cke_2_toolbox") || document.getElementById("cke_1_toolbox")) || !doc || doc.readyState != "complete") return;
 		clearInterval(hs);
 		
-		if (m = doc.body.innerHTML.match(/<p[^>]*>%INIT[\w\W]+%INPUTS\(([\w\W]*?)\)%[\w\W]*?<\/p>/i)) {
-			if (m[1]) {
+		if (m = doc.body.innerHTML.match(/#CFOR-MD-BEGIN;[\w\W]*#CFOR-MD-END;/i)) {
+			let cfor_metadata = parseMetadata(m[0], 'CFOR-MD-');
+			if (cfor_metadata && cfor_metadata.settings) {
+				if (cfor_metadata.settings.inputs) cfor_metadata.settings.inputs = JSON.parse(cfor_metadata.settings.inputs);
+				doc.body.cforSettings = cfor_metadata.settings;
+			}
+		} else if (m = doc.body.innerHTML.match(/<p[^>]*>%INIT[\w\W]+%INPUTS\(([\w\W]*?)\)%[\w\W]*?<\/p>/i)) {
+				if (m[1]) {
 				m[1] = m[1].replace(/(?<=[{,:]\s*)[a-z_]\w*(?=\s*:)/ig, '"$&"');
 				try {
-					doc.body.varInputs = JSON.parse(m[1]);
+					doc.body.cforSettings = {inputs: JSON.parse(m[1])};
 				} catch(ex) {
-					doc.body.varInputs = undefined;
+					doc.body.cforSettings = undefined;
 				}
 			}
 		}
@@ -103,16 +127,79 @@ $(function() {
 					  
 							  {text: "var", desc: "Retornar valor de variável", value: "var(<nome@up|low|ano|num>?;<tipo:text,check,calendar,choice>?;<rótulo>?;<padrão>?)"},
 							  {text: "field", desc: "Retornar valor de campo de processo", value: "field(<nome@up|low|ano|num>?;<padrão>?)"},
-							  {text: "ref", desc: "Retornar valor de referência", value: "ref(<nome:sei@link,num,ano@2|4,data@ext,id@up|low>?;<padrão>?)"},
+							  {text: "ref", desc: "Retornar valor de referência", value: "ref(<propriedade:nome,sei,link,num,ano,data>?;<padrão>?)"},
 							  {text: "extrato", desc: "Retornar extrato", value: "extrato(<fistel>?;<status:Q=Quitado,D=Devedor,P=Pendente>?;<filtro:{fistel,receita,ano,vencto,valor,status}>?)"},
 							  {text: "link_boleto", desc: "Retornar link de boleto", value: "link_boleto(<texto>?;<fistel>?;<cpfj>?)"}]}];
-							  
-		var insert_fdfn = function(data) {
+
+
+		var getIntellisenseList = function(e) {
+			switch (e.token) {
+				case "%": {
+					if (e.previous && e.previous.match(/\d+(?:,\d+)?$/)) return false;
+					return fdfns;
+				}
+
+				case "$": {
+					if (e.previous === 'R') return false;
+					let variables = [];
+
+					let inputs = doc.body.cforSettings && doc.body.cforSettings.inputs;
+					if (inputs && inputs.length) inputs.forEach(i => variables.push({text: i.name, desc: i.label, class: "cfor-li-var"}));
+
+					let mv, rv = /%var\(\s*([^;]+)\s*;\s*(text|check|calendar|choice)[^;]*?;\s*([^;\)]+)/gi;
+
+					while (mv = rv.exec(doc.body.innerHTML)) {
+						if (mv.index === rv.lastIndex) rv.lastIndex++;
+						variables.push({text: mv[1], desc: mv[3], class: "cfor-li-var"});
+					}
+					
+					variables.push({text: "ref.nome", desc: "Nome do documento de referência", class: "cfor-li-var-struct"});
+					variables.push({text: "ref.sei", desc: "Número sei do documento de referência", class: "cfor-li-var-struct"});
+					variables.push({text: "ref.num", desc: "Número sequencial do documento de referência", class: "cfor-li-var-struct"});
+					variables.push({text: "ref.data", desc: "Data do documento de referência", class: "cfor-li-var-struct"});
+					variables.push({text: "ref.ano", desc: "Ano do documento de referência", class: "cfor-li-var-struct"});
+					variables.push({text: "ref.link", desc: "Link para o documento de referência", class: "cfor-li-var-struct"});
+
+					return variables;
+				}
+
+				case ".": {
+					if (e.previous && e.previous[0] == "$") {
+
+						e.previous = e.previous.substr(1);
+
+						if (e.previous != "ref" && !doc.body.cforSettings.inputs.find(i => i.name == e.previous && i.type == "ref")) break;
+
+						return [{text: "nome", desc: "Nome do documento", class: "cfor-li-var-prop"},
+								{text: "sei", desc: "Número SEI do documento", class: "cfor-li-var-prop"},
+								{text: "num", desc: "Número sequencial do documento", class: "cfor-li-var-prop"},
+								{text: "data", desc: "Data do documento", class: "cfor-li-var-prop"},
+								{text: "ano", desc: "Ano do documento", class: "cfor-li-var-prop"},
+								{text: "link", desc: "Link para o documento", class: "cfor-li-var-prop"}];
+					}
+				}
+
+				case "@": {
+					let fds = fdfns[0].items;
+					e.previous = e.previous.toLowerCase();
+					
+					let format = "";
+					if (e.previous[0] == "$") format = "up|low|num|ano|ext";
+					else if (f = fds.find((i) => {return (i.format && i.text == e.previous)})) format = f.format;
+					
+					if (format) return format.split("|").map((v) => {return {text: v, class: "cfor-li-format"}});
+				}
+			}
+			
+			return false;
+		};						  
+
+		var insertNode = function(data, complement) {
 			let sel = doc.getSelection();
 			
 			if (sel.rangeCount > 1) return;
 
-			let h, is_fun_template;
+			let is_fun_template;
 			
 			
 			if (is_fun_template = (data.match(/[^<]*\<[^>]*?\>\?.*/) != null)) {
@@ -126,10 +213,9 @@ $(function() {
 			
 			let withHighLight = (text.match(/{#(?:if\s+|\?)[^}]*$/i) == null);
 			
-			
 			if (is_fun_template) {
-				let $node_fn = $("<span></span>").addClass("cfor-function-editor").prop("contenteditable", "false").prop("spellcheck", "false").append(data);	
-				if (withHighLight) $node_fn.css("background-color", "#ff0");
+				let $node_fn = $("<span></span>").addClass("cfor-function-editor").prop("contenteditable", false).prop("spellcheck", false).append(data);	
+				if (withHighLight) $node_fn.css("background-color", "#fdca00");
 
 				let range = sel.getRangeAt(sel.rangeCount-1);
 				range.deleteContents();
@@ -144,8 +230,8 @@ $(function() {
 					range.deleteContents();
 					
 					if (withHighLight) {
-						node = $("<span></span>").append(node).get(0);
-						$(node).css("background-color", "#ff0");
+						node = $("<span></span>").addClass("cfor-node").append(node).get(0);
+						$(node).css("background-color", "#fdca00").prop("spellcheck", false);
 					} 
 					
 					range.insertNode(node);
@@ -256,35 +342,28 @@ $(function() {
 				$node_fn.find("span:first").focus();
 				
 			} else {
-
 				let range = sel.getRangeAt(sel.rangeCount-1);
 				range.deleteContents();
-
 				node = doc.createTextNode(data);
-			
-				//highlight
-				if (withHighLight) node = $("<span></span>").css("background-color", "#ff0").append(node).get(0);
-				range.insertNode(node);
-				if (h) { 
-					if (withHighLight) node = node.childNodes[0];
-					range = doc.createRange();
-					range.setStart(node, h);
-					range.setEnd(node, h+1);
-					sel.removeAllRanges();
-					sel.addRange(range);
-				} else if (!withHighLight) range.collapse(false);
+				if (withHighLight && complement !== true) node = $("<span></span>").addClass('cfor-node').prop("title", complement).prop("spellcheck", false).css("background-color", "#fdca00").append(node).get(0);
+				if (complement === true && !range.startOffset && range.startContainer.previousSibling && range.startContainer.previousSibling.tagName == "SPAN") {
+					range.startContainer.previousSibling.appendChild(node);
+					range.selectNode(node);
+				} else range.insertNode(node);
+
+				range.collapse(false);
 			}
 		};		
+							  
 		
 		//--- Criar barra e botões de ferramenta
 		var toolbar = create_toolbar(main_toolbox);
-		var btn_in = add_btn(toolbar, "cke_cfor_in", "Tabela de Entradas", "inputs.png", {enabled: true});
+		var btn_set = add_btn(toolbar, "cke_cfor_set", "Configurações do Texto Padrão", "inputs.png", {enabled: true});
 		add_separator(toolbar);
-		var btn_field = add_btn(toolbar, "cke_cfor_field", "Inserir Campos e Funções", "field.png", {list: fdfns, enabled: false}, insert_fdfn);
 		var btn_filter = add_btn(toolbar, "cke_cfor_filter", "Editar Filtros", "filter.png", {enabled: false});
 		add_separator(toolbar);
 		var btn_cpyfmt = add_btn(toolbar, "cke_cfor_cpyfmt", "Copiar estilo de célula", "brush.png", {toggleable: true, enabled: false});
-		var btn_bm = add_btn(toolbar, "cke_cfor_bm", "Setar marcador", "bm.png", {enabled: false});
+		// var btn_bm = add_btn(toolbar, "cke_cfor_bm", "Setar marcador", "bm.png", {enabled: false});
 		add_separator(toolbar);
 		var btn_tb = add_btn(toolbar, "cke_cfor_tb", "Criar/Editar Tabela Dinâmica", "fill-table.png", {enabled: false});
 
@@ -296,20 +375,22 @@ $(function() {
 		var table_tooltip_options = {attr: "dynamic-table-data", html: '<span class="tooltip-data-fill">Dados: </span> <span class="tooltip-content">$0</span>'};
 		
 		//--- Opções de intellisense
-		var edit_intellisense_options =	{tokens: "%", list: fdfns, onSelect: function(e) {
-			let new_value = "%" + e.value.replace(/<([^:>]+)[^>]*?>\?/g, "$1") + "%";
-			let v = $(this).val();
-			v = v.substring(0, e.range.start) + new_value + v.slice(e.range.end);
-			$(this).val(v);
-			
-			if ((ini = new_value.indexOf("(")) > 0 && (fin = new_value.indexOf(")", ini)) > 0) {
-				this.selectionStart = e.range.start + ini + 1;
-				this.selectionEnd = e.range.start + fin;
-			}
+		var edit_intellisense_options = {tokens: "%@$.", includePreviousChars: "$\\.", list: getIntellisenseList, onSelect: function(e) {
+			if (e.token == "%") {
+				let new_value = "%" + e.value.replace(/<([^:>]+)[^>]*?>\?/g, "$1") + "%";
+				let v = $(this).val();
+				v = v.substring(0, e.range.start) + new_value + v.slice(e.range.end);
+				$(this).val(v);
+				
+				if ((ini = new_value.indexOf("(")) > 0 && (fin = new_value.indexOf(")", ini)) > 0) {
+					this.selectionStart = e.range.start + ini + 1;
+					this.selectionEnd = e.range.start + fin;
+				}
+				return;
+			} else return e.token + e.value;
 		}};
 		
 		var sigec_intellisense_options = {onlyTokens: false, list: "fistel,seq,rec,vencto,valor,status", onSelect: (e) => {return `{${e.value}}`}};					
-		
 		
 		var edit_filter = function(elems) {
 			
@@ -459,38 +540,99 @@ $(function() {
 		
 
 		// Ação do botão de marcador
- 		btn_bm.fn = function (e) {
-			let sel = doc.getSelection();
-			if (sel.rangeCount != 1) return;
-			if (td = $(sel.anchorNode.parentElement).closest('td').get(0)) edit_bookmark(td);
-		};
+ 		// btn_bm.fn = function (e) {
+		// 	let sel = doc.getSelection();
+		// 	if (sel.rangeCount != 1) return;
+		// 	if (td = $(sel.anchorNode.parentElement).closest('td').get(0)) edit_bookmark(td);
+		// };
 		
-		// Ação do botão de tabela de entradas
- 		btn_in.fn = function (e) {
+		// Ação do botão de configurações do texsto padrão
+ 		btn_set.fn = function (e) {
+			let dlg_fields = [];
+			if (!doc.body.cforSettings) doc.body.cforSettings = {};
+
+			var column_intellisense_options = {tokens: "%@$.", includePreviousChars: "$\\.", width: 200,
+			list: function(e) {
+				if (e.token == "$") {
+					if (e.previous === 'R') return false;
+					let variables = [];
+
+					let inputs = e.target.table.EdTable.get();
+					if (inputs && inputs.length) inputs.forEach((item, index) => {
+						if ((index+1) == e.target.cell.row || !item.name || !item.label) return;
+						if (e.target.column.id == "condition") variables.push({value: (index+1).toString(), text: "Condição da Linha " + (index+1), class: "cfor-li-intellisense"});
+						variables.push({text: item.name, desc: item.label, class: "cfor-li-var"});
+					});
+
+					let mv, rv = /%var\(\s*([^;]+)\s*;\s*(text|check|calendar|choice)[^;]*?;\s*([^;\)]+)/gi;
+
+					while (mv = rv.exec(doc.body.innerHTML)) {
+						if (mv.index === rv.lastIndex) rv.lastIndex++;
+						variables.push({text: mv[1], desc: mv[3], class: "cfor-li-var"});
+					}
+					
+					variables.push({text: "ref.nome", desc: "Nome do documento de referência", class: "cfor-li-var-struct"});
+					variables.push({text: "ref.sei", desc: "Número sei do documento de referência", class: "cfor-li-var-struct"});
+					variables.push({text: "ref.num", desc: "Número sequencial do documento de referência", class: "cfor-li-var-struct"});
+					variables.push({text: "ref.data", desc: "Data do documento de referência", class: "cfor-li-var-struct"});
+					variables.push({text: "ref.ano", desc: "Ano do documento de referência", class: "cfor-li-var-struct"});
+					variables.push({text: "ref.link", desc: "Link para o documento de referência", class: "cfor-li-var-struct"});
+
+					return variables;
+				} else return getIntellisenseList(e);
+			}, 
+
+			onSelect: function(e) {
+				if (e.token == "%") {
+					let new_value = "%" + e.value.replace(/<([^:>]+)[^>]*?>\?/g, "$1") + "%";
+					let v = $(this).val();
+					v = v.substring(0, e.range.start) + new_value + v.slice(e.range.end);
+					$(this).val(v);
+					
+					if ((ini = new_value.indexOf("(")) > 0 && (fin = new_value.indexOf(")", ini)) > 0) {
+						this.selectionStart = e.range.start + ini + 1;
+						this.selectionEnd = e.range.start + fin;
+					}
+					return;
+				} else return e.token + e.value;
+			}};
+	
 			
-			open_dialog("inputs_dlg", "Tabela de Entradas", 800, 50, "Limpar",
-						[{id: "vars", type: "edtable", label: null, label_position: "top", value: doc.body.varInputs, width: "800px", 
+			dlg_fields.push({type: "separator", label: "Variáveis de Entrada"});
+			dlg_fields.push({id: "inputs", type: "edtable", label: null, label_position: "top", value: doc.body.cforSettings.inputs, width: "850px", 
 						
-						  options: {
-							  fixedHeaderClass: "vars-table",
-							  
-							  columns: [{id: "name", type: "text", label: "Nome", width: "1rs"},
+  							 options: {
+								fixedHeaderClass: "vars-table",
+								showLineNumber: true,
+								scrollY: 10,
+								rowHeight: 24,
+								
+								columns: [{id: "name", type: "text", label: "Nome", width: "1rs"},
 										{id: "label", type: "text", label: "Rótulo", width: "2.5rs"},
-										{id: "type", type: "select", label: "Tipo", options:"text,check,calendar,choice", width: "1rs"},
-										{id: "options", type: "text", label: "Opções", width: "2rs"},
-										{id: "value", type: "text", label: "Valor", width: "1rs"},
-										{id: "visibility", type: "text", label: "Visibilidade", width: "2rs"}
-									   ]
-						  }
-						  
-						 }], e => {
+										{id: "type", type: "select", label: "Tipo", options:"text,check,calendar,choice,ref", width: "1rs"},
+										{id: "options", label: "Opções", type: [
+											{condition: "$type == ref", type: "select", options: ",?=Documento,AT=Ato,EX=Documento Externo,CL=Checklist,DP=Despacho,IF=Informe,OF=Ofício,LC=Licença"},
+											{type: "text"}
+										], width: "2rs"},
+										{id: "value", type: "text", label: "Valor", width: "1rs", intellisense: column_intellisense_options},
+										{id: "condition", type: "text", label: "Condição", width: "2rs", intellisense: column_intellisense_options}
+										]
+							 }
+			});
+
+			dlg_fields.push({type: "separator", label: "Referência"});
+			dlg_fields.push({id: "reft", type: "select", label: "Tipo", items: "_=Nenhuma,?=Documento,AT=Ato,EX=Documento Externo,CL=Checklist,DP=Despacho,IF=Informe,OF=Ofício,LC=Licença", value: doc.body.cforSettings.reft});
+			dlg_fields.push({id: "refv", type: "check", label: "Permitir edição mesmo que previamente selecionada", inline: true, value: doc.body.cforSettings.refv});
+
+			
+			open_dialog("inputs_dlg", "Configurações", 800, 50, "Limpar", dlg_fields, e => {
 
 				if (e.action == "limpar") {
-					e.fields.vars.value = null;
+					e.fields.clear();
 					return false;
  				} else if (e.action != "ok") return true;
-				
-				doc.body.varInputs = e.data.vars;
+
+				 doc.body.cforSettings = e.data;
 				return true;
 			});
 			
@@ -541,8 +683,7 @@ $(function() {
 						 {id: "dados", type: "text", label: "Dados:", label_position: "top", value: default_data, intellisense: edit_intellisense_options}], e => {
 
 				if (e.action == "limpar") {
-					e.fields.id.value = "";
-					e.fields.dados.value = "";
+					e.fields.clear();
 					return false;
  				} else if (e.action != "ok") return true;
 				
@@ -699,18 +840,18 @@ $(function() {
 			$(doc).find('table[dynamic-table]').tooltip(table_tooltip_options);
 			
 			$(doc).on("focus click", (evt) => {
-				en_btn(btn_field);
+				// en_btn(btn_field);
 				en_btn(btn_filter);
 				en_btn(btn_cpyfmt);
-				en_btn(btn_bm);
+				// en_btn(btn_bm);
 				en_btn(btn_tb);
 			});
 
 			$(doc).on("blur", (evt) => {
 				dis_btn(btn_filter);
-				dis_btn(btn_field);
+				// dis_btn(btn_field);
 				dis_btn(btn_cpyfmt);
-				dis_btn(btn_bm);
+				// dis_btn(btn_bm);
 				dis_btn(btn_tb);
 				btn_cpyfmt.checked(false);
 			});
@@ -722,36 +863,21 @@ $(function() {
 				}
 			});
 			
-			enableIntellisense(doc, {tokens: "%@", 
+			enableIntellisense(doc, {tokens: "%@$.", 
 			
-									 includePreviousChars: "$",
+									 includePreviousChars: "$\\.",
 			
-									 list: function(e) {
-										 if (e.token == "%") return fdfns; 
-										 
-										 if (e.token == "@" && e.previous) {
-											 let fds = fdfns[0].items;
-											 e.previous = e.previous.toLowerCase();
-											 
-											 let format = "";
-											 if (e.previous[0] == "$") format = "up|low|num|ano";
-											 else if (f = fds.find((i) => {return (i.format && i.text == e.previous)})) format = f.format;
-											 
-											 if (format) return format.split("|").map((v) => {return {text: v, class: "cfor-li-format"}});
-											 
-											 //if (f = fds.find((i) => {return (i.format && i.text == e.previous)})) return f.format.split("|").map((v) => {return {text: v, class: "cfor-li-format"}});
-										 }
-										 
-										 return false;
-									 }, 
-									 
+									 list: getIntellisenseList,
+
 									 onSelect: function(e) {
-										 if (e.token == "%") {
-											insert_fdfn(`%${e.value}%`);
-											return;										 
-										 }
-										 
-										 if (e.token == "@") return `@${e.value}`;
+										
+										 if (e.token == "%")  return insertNode(`%${e.value}%`, e.desc);
+
+										 if (e.token == "$") return insertNode(`$${e.value}`, e.desc);
+
+										 if (e.token == ".") return insertNode(`.${e.value}`, true);
+
+										 if (e.token == "@") return insertNode(`@${e.value}`, true);
 									 }
 			});
 									 
@@ -776,6 +902,51 @@ $(function() {
 			
 			$(doc).on('keypress', function(e) {
 				let sel = doc.getSelection();
+
+				if (e.key == '?') {
+					let range = sel.getRangeAt(0);
+
+					if (sel.type == "Range") {
+						range = sel.getRangeAt(0);
+						node = range.startContainer;
+						index = range.startOffset;
+						
+						if (node.nodeType == 1 && node.childNodes.length) {
+							node = node.childNodes[0];
+							index = 0;
+						}
+					} else {
+						node = sel.focusNode;
+						index = sel.focusOffset;
+		
+						while (node.nodeType == 1 && node.childNodes.length) {
+							node = node.childNodes[index - 1];
+							index = node && node.nodeType == 3 ? (node.textContent.length || node.wholeText.length) : node.childNodes.length;
+						}
+					}
+					
+					
+					let n = node;
+					let leftText = node.textContent.slice(0, index);
+					while (n = n.previousSibling) leftText = $(n).text() + leftText;
+
+					if (leftText.match(/\$\w+(?:\.\w+)*(?:\@\w+)?\?$/i)) {
+						if (range.startOffset < 2 && range.startContainer.previousSibling && range.startContainer.previousSibling.tagName == "SPAN") {
+							e.preventDefault();
+
+							let dest = range.startContainer.previousSibling;
+							range.setStart(sel.anchorNode, 0);
+							node = range.extractContents();
+							if (node.lastChild && node.lastChild.nodeType == 3) node.lastChild.nodeValue += "?";
+							else node.appendChild(doc.createTextNode("?"));							
+							dest.appendChild(node);
+							range.selectNode(dest.lastChild);
+							range.collapse(false);
+							return;
+						} 
+					}
+				}
+
 				if (sel.rangeCount > 1) return;
 				
 				let range = sel.getRangeAt(0);
@@ -811,10 +982,10 @@ $(function() {
 					let node = startNode;
 					
 					let text = node.textContent;
-					while (!text.match(/{#if\s+|{#else|{#endif|{#\?/i) && (node = node.previousSibling)) text = (node.nodeType==3?node.textContent:node.innerText) + text;
+					while (!text.match(/{#if\s+|{#else|{#endif|{#begin|{#end|{#\?/i) && (node = node.previousSibling)) text = (node.nodeType==3?node.textContent:node.innerText) + text;
 					
 					if (node) {
-						let m = text.match(/{#(:?if\s+|else|endif|\?)[^}]*$/i);
+						let m = text.match(/{#(:?if\s+|begin\s+|else|endif|end|\?)[^}]*$/i);
 						if (!m) return;
 						let startNode = node;
 						let startOffset = m.index;

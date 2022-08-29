@@ -1,4 +1,4 @@
-﻿/************************************************/	
+/************************************************/	
 /*	Documento CSS								*/
 /*	Autor: Fábio Fernandes Bezerra				*/
 /************************************************/
@@ -93,7 +93,7 @@
 
 
 .edtable-bar {
-    display: inline-block;
+    /* display: inline-block; */
     width: 5px;
     padding-left: 5px;	
     overflow: hidden;
@@ -110,4 +110,28 @@
 .edtable-bar:hover {
     width: 80px;
     padding: 0 10px 0 10px;
+}
+
+.edtable-bar-btn {
+	font-size: inherit;
+}
+
+.edtable-line-number {
+	counter-reset: serial-number;  
+}
+  
+.edtable-line-number td:first-child:before {
+	counter-increment: serial-number;  
+	content: counter(serial-number);  
+}
+
+.edtable-line-number td:first-child, .edtable-line-number th:first-child {
+    text-align: center;
+    vertical-align: middle;
+    font-size: 0.9em;
+    min-width: 2em;
+    padding: 0;
+    margin: 0;
+    line-height: 0;
+    background-color: #fefefe;
 }

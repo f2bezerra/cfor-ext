@@ -18,6 +18,10 @@
 		font-size: 18px;
 		font-weight: bold;
 	}
+
+	strong {
+		font-weight: bold;
+	}
 	
 	em {
 		font-weight: bold;
@@ -163,12 +167,39 @@
 	h1 a:hover, h1 a:active {
 		text-decoration: none;
 	}	
-	
+
+	.new::after {
+		margin-left: 4px;
+		content: "novidade";
+		font-size: 10px;
+		background-color: #9a34ee;
+		color: #fff;
+		border: 1px solid #9a34ee;
+		border-radius: 14px;
+		padding: 2px;
+		display: inline-block;
+		cursor: pointer;
+	}
+
+	.deprecation::after {
+		margin-left: 4px;
+		content: "será descontinuada";
+		font-size: 10px;
+		background-color: #ee5034;
+		color: #fff;
+		border: 1px solid #ee5034;
+		border-radius: 14px;
+		padding: 2px;
+		display: inline-block;
+		cursor: pointer;
+	}	
+
 	</style>	
 </head>
 <body>
 	<ul id="top" class="breadcrumb">
 		<li><a href="#hdCampos">Campos</a></li>
+		<li><a href="#hdVariaveis">Variáveis</a></li>
 		<li><a href="#hdFuncoes">Funções</a></li>
 		<li><a href="#hdControles">Controles</a></li>
 		<li><a href="#hdCondicoes">Expressões</a></li>
@@ -348,7 +379,68 @@
 			</tr>
 		</tbody>
 	</table>
+	<br><br>
+
+	<h1 id="hdVariaveis">Variáveis de Usuário <a href="#top">Topo</a></h1>
+	<p>As variáveis de usuário são definidas através da tabela de entradas ou da função <code><a href="#fnVar">var</a></code>.</p> 
+	<p>O entrada do valor das variáveis ocorre durante o processamento do texto padrão na criação de novos documentos. Existem 5 tipos de variáveis:</p>
+	<ul>
+		<li><strong>text</strong>: Tipo Texto
+			<p>Variável de livre preenchimento textual.</p>
+		</li>
+
+		<li><strong>check</strong>: Tipo Lógico
+			<p>Variável que tem duas opções de valores possíveis: verdadeiro ou falso. Na aquisição do valor é apresentado um campo do tipo "checkbox".<br>
+			   Se o texto padrão possuir apenas um campo do tipo "check", será apresentada uma janela de confirmação durante a aquisição das variáveis de usuário.</p>
+		</li>
+
+		<li><strong>calendar</strong>: Tipo Data
+			<p>Variável que aceita valores em formato de data. Durante a aquisição das variáveis, a variável é representada por um campo específico de preenchimento de data.</p>
+		</li>
+
+		<li><strong>choice</strong>: Tipo Seleção
+			<p>Variável aceita valores definidos numa lista de valores possíveis. As opções de valores possíveis são definidas por uma string e separados por vírgula(,). <br>
+			   É possível definir valor diferente do texto apresentado, bastando para tanto informar o valor seguido do sinal de igual (=) e seguido pelo texto a ser apresentado (Exemplo: A=Ativo).</p>
+			<p>Durante a quisição das variáveis, ela é representada por um campo do tipo "caixa de seleção".</p>
+		</li>
+		<li><strong class="new">ref</strong>: Tipo Referência
+			<p>Variável que permite referenciar outros documentos do SEI.</p>
+			<p>Variáveis desse tipo permite acessar algumas informações (propriedades) do documento referenciado, que são:
+				<ul>
+					<li>nome: nome do documento;</li>
+					<li>num: número sequencial do documento;</li>
+					<li>sei: número SEI do documento;</li>
+					<li>data: data de criação do documento;</li>
+					<li>ano: ano de criação do documento;</li>
+					<li>link: link para o documento.</li>
+				</ul>
+			</p>
+			<p>Esse tipo não pode ser definido através da função <var><a href="#fnVar">var</a></var>.</p>
+		</li>
+	</ul>
 	
+	<p>As variáveis de Usuário são inseridas no texto padrão de acordo com a seguinte a sintaxe:</p>
+	<p><code>$<var>nome_variável</var>[.<var>propriedade</var>][@<var>formato</var>][??<var>valor_padrão</var>]</code></p>
+	<p>onde:
+		<ul>
+			<li>nome_variável: Nome da variável;</li>
+			<li>propriedade: Propriedades das variáveis tipo Referência;</li>
+			<li>formato: Formato de exibição do conteúdo do campo, onde:
+				<ul>
+					<li>up: Converte todas as letras para MAIÚSCULAS</li>
+					<li>low: Converte todas as letras da para minúsculas</li>
+					<li>num: Filtra todos os caracteres não-numéricos</li>
+					<li>ano: Exibe apenas o ano da data</li>
+					<li>ext: Exibe a data por extenso</li>
+					<li>i,n: Exibe "n" caracteres a partir da posição "i"</li>
+				</ul>
+			</li>
+			<li>valor_padrão: Valor a ser exibido caso nenhum valor para variável tenha sido informado</li>
+		</ul>
+	</p>
+	<p>Mesmo que nenhuma variável de usuário seja definida, informações do documento SEI passado como referência poderão ser acessadas através da variável <var>$ref</var> seguida da indicação da respectiva <var>propriedade</var>. O mesmo resultado poderá ser alcançado utilizando a função <a href="#fnRef">ref</a>.</p>
+	<br><br>
+
 	<h1 id="hdFuncoes">Funções da Extensão <a href="#top">Topo</a></h1>
 	<p>As funções da extensão CFOR dispõem de funcionalidades o SEI não oferece e possuem a sintaxe a seguir:</p>
 	<p><code><strong>%</strong>nome_função(<var>argumento1[; argumento2; ...; argumenton]</var>)<strong>%</strong></code></p>
@@ -374,7 +466,7 @@
 				</td>
 			</tr>
 			<tr>
-				<td>Valor de campo</td>
+				<td class="deprecation">Valor de campo</td>
 				<td>%field(<var>nome_campo</var>[;<var>padrão</var>])%</td>
 				<td>Procura campo de processo indicado em <var>nome_campo</var> e retorna seu valor. Caso não o campo não seja encontrado, o valor padrão é retornado.
 				<p><ins>Exemplos:</ins>
@@ -383,8 +475,8 @@
 				</p>
 				</td>
 			</tr>
-			<tr>
-				<td>Variável de documento</td>
+			<tr id="fnVar">
+				<td class="deprecation">Variável de documento</td>
 				<td>%var(<var>nome</var>[;<var>tipo</var>;<var>rótulo</var>][;<var>padrão</var>])%</td>
 				<td>Retorna o valor de uma variável informada pelo usuário.
 				<p>
@@ -405,33 +497,30 @@
 				</p>
 				</td>
 			</tr>
-			<tr>
-				<td>Dados de documento de referência</td>
+			<tr id="fnRef">
+				<td class="deprecation">Dados de documento de referência</td>
 				<td>%ref(<var>nome</var>[@<var>formato</var>][;<var>padrão</var>])%</td>
-				<td>Retorna o valor de um documento de referência.
+				<td>Retorna informações do documento passado de referência. O documento selecionado antes de escolher a opção de "criação de novo documento" é passado como referência para este.
 					<p>
-						<ins>Nomes de referência:</ins><br><br>
-						<br><code>sei</code>: Número SEI<br>
-						@link:Insere o número SEI como link<br>
-						<br><code>num</code>: Número do documento<br>
-						<br><code>id</code>: Identificação do documento<br>
-						@up:Insere o identificador do documento em letras MAIÚSCULAS<br>
-						@low:Insere o identificador do documento em letras minúsculas<br>
-						<br><code>ano</code>: Ano do documento<br>
-						@2:Insere o ano com 2 dígitos<br>
-						@4:Insere o ano com 4 dígitos<br>
-						<br><code>data</code>: Data do documento<br>
-						@ext:Insere data por extenso<br>
+						<ins>Informação:</ins><br><br>
+						<ul>
+							<li>nome: nome do documento de referência;</li>
+							<li>num: número sequencial do documento de referência;</li>
+							<li>sei: número SEI do documento de referência;</li>
+							<li>data: data de criação do documento de referência;</li>
+							<li>ano: ano de criação do documento de referência;</li>
+							<li>link: link para o documento de referência.</li>
+						</ul>
 					</p>
 					
 					<p><ins>Exemplos:</ins>
 						<code class="sample" title='Insere quando possível o número SEI do documento passado como referência. Valor padrão 12345678900'>%ref(sei;12345)%</code>
-						<code class="sample" title='Insere quando possível o link para o  documento passado como referência.'>%ref(sei@link)%</code>
+						<code class="sample" title='Insere quando possível o link para o  documento passado como referência.'>%ref(link)%</code>
 					</p>
 				</td>
 			</tr>
 			
-			<tr>
+			<!-- <tr>
 				<td>Dados de marcadores do documento de referência</td>
 				<td>%bm(<var>nome</var>)%</td>
 				<td>Retorna o valor de um maracador passado pelo documento de referência.
@@ -440,7 +529,7 @@
 						<code class="sample" title='Insere o valor do marcador "abc" do documento passado como referência.'>%bm(abc)%</code>
 					</p>
 				</td>
-			</tr>
+			</tr> -->
 			
  		</tbody>
 	</table>
@@ -474,6 +563,8 @@
 			</tr>
 		</tbody>
 	</table>
+	<br><br>
+
 	
 	<h1 id="hdCondicoes">Operações de teste <a href="#top">Topo</a></h1>
 	<table width="99%">
@@ -532,8 +623,8 @@
 			</tr>
 			<tr>
 				<td>Em</td>
-				<td><var>A</var><code> IN </code><var>B,C,D,E,F</var></td>
-				<td>Se <var>A</var> for <em>igual</em> a um dos valores em <var>B,C,D,E</var> ou <var>F</var>, então o resultado da expressão será <span class="bool-1" title="1">verdadeiro</span>, senão será <span class="bool-0" title="0">falso</span></td>
+				<td><var>A</var><code> IN </code><var>[B,C,D,E,F]</var></td>
+				<td>Se <var>A</var> for <em>igual</em> a um dos valores <var>B,C,D,E</var> ou <var>F</var>, então o resultado da expressão será <span class="bool-1" title="1">verdadeiro</span>, senão será <span class="bool-0" title="0">falso</span></td>
 			</tr>
 			<tr>
 				<td>E Lógico</td>
@@ -555,8 +646,11 @@
 				<td><code>!</code>((<var>expressão_1</var><code> && </code><var>expressão_2</var>)<code> || </code><var>expressão3</var>)</td>
 				<td>O uso de parênteses é permitido para alterar a ordem de avaliação das partes da expressão.</td>
 			</tr>
-			
-			
+			<tr>
+				<td>Atribuição</td>
+				<td><var>$variavel</var><code> = </code><var>expressão</var></td>
+				<td>Atribui o valor da <var>expressão</var> para <var>$variavel</var>.</td>
+			</tr>
 		</tbody>
 	</table>	
 	

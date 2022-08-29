@@ -298,23 +298,22 @@ function getFrameDocument(frame) {
 			case "arvore":
 				frame =  window.top.document.getElementById("ifrArvore");
 				if (!frame && document.getElementById("frmArvore")) return document; 
+				if (!frame && window.opener) frame =  window.opener.top.document.getElementById("ifrArvore");
 				break;
 				
 			case "ifrVisualizacao":
 			case "visualizacao":
 			case "visualizador":
 				frame =  window.top.document.getElementById("ifrVisualizacao");
+				if (!frame && window.opener) frame =  window.opener.top.document.getElementById("ifrVisualizacao");
 				break;
 				
 			case "ifrArvoreHtml":
 			case "documento":
 				frame =  window.top.document.getElementById("ifrVisualizacao");
-				if (!frame) {
-					if (document.getElementById("divArvoreHtml")) return document; 
-					return null;
-				} 
-				
-				frame = (frame.contentDocument || frame.contentWindow.document).getElementById("ifrArvoreHtml");
+				if (!frame && document.getElementById("divArvoreHtml")) return document; 
+				if (!frame && window.opener) frame =  window.opener.top.document.getElementById("ifrVisualizacao");
+				frame = frame && ((frame.contentDocument || frame.contentWindow.document).getElementById("ifrArvoreHtml"));
 				break;
 		}
 	}
@@ -442,6 +441,7 @@ function getUrlDocumento(id, last) {
 	
 	return get_documento();
 }
+
 
 //Atualizar andamento
 function atualizarAndamento(text) {
@@ -595,80 +595,94 @@ function consultarUsuarioExterno(id) {
 }
 
 
-//Alterar nível de acesso de documento
-async function alterarDocumento(url_doc_alterar, anchor_doc_alterar, descricao, acesso = 0) {
+//Alterar dados do documento
+async function alterarDocumento(url_doc_alterar, anchor, nome, acesso = 0) {
 	if (!url_doc_alterar) return Promise.reject("Endereço de alteração não informado");
 	
 	var acesso_publico = (acesso == 0);
-	var hipotese = 34;
+	var hipotese, txt_hipotese;
 	
 	switch (acesso) {
-		case 1: hipotese = 34; break; //Informação pessoal
-		case 2: hipotese = 38; break; //Informação econômica
+		case 1: 
+			hipotese = 34; 
+			txt_hipotese = "Informação Pessoal (Art. 31 da Lei nº 12.527/2011)";
+			break; 
+		case 2: 
+			hipotese = 38;
+			txt_hipotese = "Informações Econômico-Financeiras de Empresa (Art. 39, parágrafo único, da Lei nº 9.472/1997)";
+			break; 
+
+		default:
+			if (!acesso_publico) return false;		
 	}
 
+	var old_name;
+
+	waitMessage("Atualizando documento...");
 	return updateFormSEI(url_doc_alterar, "frmDocumentoCadastro", "btnSalvar", function (doc) {
 		if (acesso_publico) {
-			if ($optPublico = $(doc).find("#optPublico")) {
-				$optPublico.trigger("click");
-				let obs = $(doc).find("#txaObservacoes").val().replace(/com base na LGPD\b[^.]+\.\n*/ig,"");
-				$(doc).find("#txaObservacoes").val(obs);
-				$(doc).find("#selHipoteseLegal").val(0);
-			} else return false;
+			$(doc).find("#optPublico").prop("checked", true);
+			$(doc).find("#selGrauSigilo").val(null);
+			$(doc).find("#selHipoteseLegal").val(null);
+
+			let obs = $(doc).find("#txaObservacoes").val().replace(/com base na LGPD\b[^.]+\.\n*/ig,"");
+			$(doc).find("#txaObservacoes").val(obs);
 		} else {
-			if ($optRestrito = $(doc).find("#optRestrito")) {
-				$optRestrito.trigger("click");
-				$optRestrito.prop("checked", true);
-				if ($selHipo = $(doc).find("#selHipoteseLegal")) {
-					if (!$selHipo.find(`option[value=${hipotese}]`).length) $selHipo.append(`<option value="${hipotese}" />`)
-					$selHipo.val(hipotese);
-					$selHipo.trigger("change");
-					let obs = $(doc).find("#txaObservacoes").val().replace(/com base na LGPD\b[^.]+\.\n*/ig,"").replace(/^[\n\r\s]+|[\n\r\s]+$/g, "");
-					if (acesso == 1) obs = "Com base na LGPD, documento de identificação de pessoa física com informação biométrica, endereço de pessoa física, números de CPF ou RG, assim como, data de nascimento, e-mail pessoal e número de telefone fixo/móvel pessoal são informações pessoais." + (obs?"\n\n":"") + obs;
-					$(doc).find("#txaObservacoes").val(obs);
-				} else return false;
-				
-			} else return false;
+			$(doc).find("#optRestrito").prop("checked", true);
+			$(doc).find("#selGrauSigilo").val(null);
+
+			$sel_hipotese = $(doc).find("#selHipoteseLegal");
+			if (!$sel_hipotese.find(`option[value=${hipotese}]`).length) $sel_hipotese.append(`<option value="${hipotese}" />`)
+			$sel_hipotese.val(hipotese);
+
+			let obs = $(doc).find("#txaObservacoes").val().replace(/com base na LGPD\b[^.]+\.\n*/ig,"").replace(/^[\n\r\s]+|[\n\r\s]+$/g, "");
+			if (acesso == 1) obs = "Com base na LGPD, documento de identificação de pessoa física com informação biométrica, endereço de pessoa física, números de CPF ou RG, assim como, data de nascimento, e-mail pessoal e número de telefone fixo/móvel pessoal são informações pessoais." + (obs?"\n\n":"") + obs;
+			$(doc).find("#txaObservacoes").val(obs);
 		}
 		
-		if (descricao) $(doc).find("#txtNumero").val(descricao);
+		if (nome) {
+			old_name = $(doc).find("#txtNomeArvore").val();
+			$(doc).find("#txtNomeArvore").val(nome);
+		}
+
 		return true;
-		
 	}).then(()=>{
-		if (!anchor_doc_alterar) return true;
+		if (!anchor) return true;
 		
-		let anchor_id = $(anchor_doc_alterar).attr('id').replace(/\D/g, "");
-		
-		$(anchor_doc_alterar).next('img[src*=espaco]').remove();
-		$(anchor_doc_alterar).nextAll(`#anchorNA${anchor_id}`).remove();
-		if (!acesso_publico) {
-			let anchor_restrito;
-			
-			if (acesso == 1) {
-				anchor_restrito = `<img src="/infra_css/imagens/espaco.gif">
-				<a id="anchorNA${anchor_id}" href="javascript:alert('Acesso Restrito\nInformação Pessoal (Art. 31 da Lei nº 12.527/2011)');">
-				  <img src="imagens/sei_chave_restrito.gif" id="iconNA${anchor_id}" title="Acesso Restrito Informação Pessoal (Art. 31 da Lei nº 12.527/2011)" align="absbottom">
-				</a>`;
-			} else {
-				anchor_restrito = `<img src="/infra_css/imagens/espaco.gif">
-				<a id="anchorNA${anchor_id}" href="javascript:alert('Acesso Restrito\nInformações Econômico-Financeiras de Empresa (Art. 39, parágrafo único, da Lei nº 9.472/1997)');">
-				  <img src="imagens/sei_chave_restrito.gif" id="iconNA${anchor_id}" title="Informações Econômico-Financeiras de Empresa (Art. 39, parágrafo único, da Lei nº 9.472/1997)" align="absbottom">
-				</a>`;
+		let anchor_id = $(anchor).attr('id').replace(/\D/g, "");
+		let anchor_na = $(anchor).parent().find(`#anchorNA${anchor_id}`).get(0);
+		if (anchor === anchor_na) anchor = $(anchor).parent().find(`#anchor${anchor_id}`).get(0); 
+
+		if (acesso_publico) {
+			if (anchor_na) {
+				$(anchor_na).prev('img[src*=espaco]').remove();
+				$(anchor_na).next('img[src*=espaco]').remove();
+				$(anchor_na).remove();
 			}
-			
-			$(anchor_doc_alterar).after(anchor_restrito);
+		} else {
+			if (anchor_na) $(anchor_na).find("img").attr("src", "svg/processo_restrito.svg?11").attr("title", `Acesso Restrito\n${txt_hipotese}`);
+			else {
+				anchor_na = `<img src="/infra_css/imagens/espaco.gif">
+				<a id="anchorNA${anchor_id}" href="javascript:alert('Acesso Restrito\\n${txt_hipotese}');">
+				  <img src="svg/processo_restrito.svg?11" id="iconNA${anchor_id}" title="${txt_hipotese}" align="absbottom">
+				</a>`;
+				
+				$(anchor).parent().find(`#anchorUG${anchor_id}`).after(anchor_na);
+			}
 		}
 		
-		if (descricao) {
-			let text = $(anchor_doc_alterar).text();
-			if (mtext = text.match(/^\s*([\w\d]+).*(\(\d+\))/)) {
-				let new_text = mtext[1] + " " + descricao + " " + mtext[2];
-				$(anchor_doc_alterar).html($(anchor_doc_alterar).html().replace(text, new_text));
-			} 
+		if (nome) {
+			let text = $(anchor).text();
+			if (old_name) $(anchor).html($(anchor).html().replace(new RegExp(`(.+\\s)${old_name}`), `$1${nome}`));
+			else $(anchor).html($(anchor).html().replace(new RegExp(`(.+\\s)`), `$1${nome} `));
 		}
-		
+
+		waitMessage(null);		
 		return true;
-	}).catch(() => false);
+	}).catch(() => {
+		waitMessage(null);		
+		return false;
+	});
 }
 
 
@@ -687,80 +701,449 @@ function getCurrentProcesso() {
 }
 
 
-//Retorna referência para o documento selecionado no processo
-function getCurrentReference(getDocument) {
-	if ((arvore_doc = getFrameDocument("arvore")) && (anchor = $(arvore_doc).find('.infraArvoreNoSelecionado').closest('a').get(0)) && (doc = $(anchor).text())) {
-		if (m_doc = doc.match(/^\s*(\d{5}\.\d{6}\/\d{4}\-\d{2})\s*$|^\s*(([^\s]+)[^\d]*(\b\d+\b)?.*)\s+\(?(\d+)\)?\s*$/)) {
-			let reference = m_doc[1] ? {id: m_doc[1], tipo: "processo", sei: m_doc[1].replace(/\D/g,"")} : {id: m_doc[2], name: m_doc[3], tipo: filterAccents(m_doc[3], String.prototype.toLowerCase), sei: m_doc[5]};
-			if (m_doc[4]) reference.num = m_doc[4];
-			
-			if (m = $(anchor).attr('id').match(/^anchor(\d+)/i)) reference.protocolo = m[1];
-			
-			let iframe_visualizador =  window.top.document.getElementById("ifrVisualizacao");
-			if (!iframe_visualizador) return reference;
-			
-			let doc_visualizador = iframe_visualizador.contentDocument || iframe_visualizador.contentWindow.document;
-			
-			if (!doc_visualizador || (doc_visualizador.readyState != "complete" && doc_visualizador.readyState != "interactive")) return reference;
-			
-			let iframe_doc = doc_visualizador.getElementById("ifrArvoreHtml");
-			
-			if (!iframe_doc) return reference;
-			
-			if (reference.protocolo && (src = $(arvore_doc).find(`#icon${reference.protocolo}`).attr('src')) && (src.match(/\bpdf\./i))) {
-				if (url =  $(doc_visualizador).find('a[href*="controlador.php?acao=documento_alterar_recebido"]').attr('href')) {
-					let result = syncAjaxRequest(url);
-					if (result.ok && (data_doc = $(result.response).find("#txtDataElaboracao").val())) {
-						reference.data = data_doc;
-						reference.ano = data_doc.slice(-4);
-					}
+
+/** Objeto com informações de documento/processo */
+class NodeSei {
+	#href = undefined;
+	#__doc = undefined;
+	#__fullName = undefined;
+	#__date = undefined;
+	#__bm = undefined;
+
+	get fullName() {
+		if (this.#__fullName !== undefined) return this.#__fullName;
+		this.readDocument();
+		return this.#__fullName;
+	}
+
+	get date() {
+		if (this.#__date !== undefined) return this.#__date;
+		this.readDocument();
+		return this.#__date;
+	}
+
+	get year() {
+		if (this.#__date !== undefined) return this.#__date.slice(-4);
+		this.readDocument();
+		return this.#__date ? this.#__date.slice(-4) : '';
+	}
+
+	get bm() {
+		if (this.#__bm !== undefined) return this.#__bm;
+		this.readDocument();
+		return this.#__bm;
+	}
+
+	get bm() {
+		if (this.#__bm !== undefined) return this.#__bm;
+		this.readDocument();
+		return this.#__bm;
+	}
+
+
+	/**
+	 * Criar instância de NodeSei
+	 * @param {object} source
+	 */
+	constructor (source) {
+		if (!source) throw new Error("Fonte nula");
+
+		const regex_text = /^\s*(\d{5}\.\d{6}\/\d{4}\-\d{2})\s*$|^\s*(([^\s]+)[^\d]*(\b\d+\b)?.*)\s+\(?(\d+)\)?\s*$/;
+		let m, r;
+
+		if (typeof source == 'object') {
+
+			if (source instanceof Element) {
+				if (source.tagName != 'A') source = source.closest('a');
+				if (!source || !(m = $(source).text().match(regex_text))) throw new Error("Fonte inválida");
+			} else {
+				let fields = ["name", "type", "tipology", "sei", "id", "extern", {date: "#__date", bm: "#__bm", fullName: "#__fullName"}];
+				for (let f in fields) {
+					if (typeof f === "string") this[f] = source[f];
+					else for (let k in Object.keys(fields[f])) this[fields[f][k]] = source[k];
 				}
+				this.#__doc = null;
+				return;
 			}
+
+		} else if (typeof source == 'string') {
+			let data = [];
+			r = /(?<=")[^"]*?(?=",)|[^,"]+/g;
+			while (m = r.exec(source)) {
+				if (m.index === r.lastIndex) r.lastIndex++;
+				data.push(m[0]);
+			}
+			if (!data.length || !(m = data[5].match(regex_text))) throw new Error("Formato inválido da fonte");
+			source = data;
+		} else throw new Error("Tipo de fonte desconhecido");
+
+		if (m[1]) {
+			this.name = 'Processo ' + m[1];
+			this.type = "PC";
+			this.tipology = 'processo';
+			this.sei = m[1].replace(/\D/g,"");
+		} else {
+			this.name = m[2];
+			this.type = NodeSei.translateType(m[3]);
+			this.tipology = filterAccents(m[3], String.prototype.toLowerCase);
+			this.sei = m[5];
+		}
+
+		if (m[4]) this.num = m[4];
+
+		if (Array.isArray(source)) {
+			this.id = source[1];
+			this.#href = source[source.length-1];
+			this.extern = !!(source[7] && source[7].match(/\bpdf\./i));
+		} else {
+			this.id = $(source).attr('id').replace(/\D/g, '');
+			syncWaitDocumentReady(source.ownerDocument);
+
+			let data = source.ownerDocument.documentElement.innerHTML.match(new RegExp(`controlador\\.php\\?acao=documento_visualizar&.*?&id_documento=${this.id}\\b[^'"]*`, "i"));
+			this.#href = data ? data[0] : null;
+
+			if (this.id && (data = $(source.ownerDocument).find(`#icon${this.id}`).attr('src'))) this.extern = !!data.match(/\bpdf\./i);
+			else this.extern = false;
+		}
+
+		if (this.extern) this.#__fullName = this.name;
+	}
+
+	readDocument() {
+		if (this.#__doc !== undefined) return this.#__doc;
+		this.#__doc = null;
+		this.#__date = '';
+		this.#__bm = null;
+		this.#__fullName = this.name;
+
+		if (this.type == 'PC') return this.#__doc;
+
+		let m;
+
+		if (this.extern) {
+			let doc_arvore = getFrameDocument('arvore');
+			m = doc_arvore && $(doc_arvore).find('script:contains("inicializar()")').text();
+
+			if (m = m && m.match(new RegExp(`controlador\\.php\\?acao=documento_alterar_recebido\\b.*?id_documento=${this.id}[^"]+`, 'i'))) {
+				let result = syncAjaxRequest(url);
+				if (result.ok && (result = $(result.response).find("#txtDataElaboracao").val())) this.#__date = result;
+			}
+	
+		} else if (this.#href) {
+			let frame =  window.top.document.getElementById("ifrVisualizacao") || (window.opener && window.opener.top.document.getElementById("ifrVisualizacao"));
+			if (frame && frame.src == this.#href) this.#__doc = getFrameDocument('documento');
+			else {
+				let result = syncAjaxRequest(this.#href, 'GET', null, {domParse: true});
+				if (!result.ok) return false;
+				this.#__doc = result.response;
+			}
+
+			if (this.#__doc) {
+				if ((m = this.#__doc.body.children[this.#__doc.body.children.length-1].innerText) && (m = m.match(/[0123]\d\/[01]\d\/\d{4}/))) this.#__date = m[0];
+
+				if (m = this.#__doc.body.innerText.match(/(?:Ofício|Informe|Ato)\s*nº\s*\d+[^>\n\r]*?(?:199\d|20\d{2})(?:[\w\d/-]+)?/i)) this.#__fullName = m[0];
 			
-			try {
-				let doc = (iframe_doc.contentDocument || iframe_doc.contentWindow.document);
-				
-				if (!doc || (doc.readyState != "complete" && doc.readyState != "interactive")) return reference;
-				
-				if (getDocument) reference.doc = doc;
-				
-				if ((dt = doc.body.lastChild.nodeValue) && (dt = dt.match(/[0123]\d\/[01]\d\/(\d{4})/))) {
-					reference.data = dt[0];
-					reference.ano = dt[1];
-				}
-				
-				if (id = doc.body.innerHTML.match(/(?:Ofício|Informe|Ato)\s*nº\s*\d+[^>\n\r]*?(?:199\d|20\d{2})(?:[\w\d/-]+)?/i)) reference.id = id[0];
-				
-				$(doc).find('[bm]').each((index, item) => {
-					if (bm_name = identityNormalize($(item).attr("bm"))) {
-						if (!reference.bookmark) reference.bookmark = {};
-						reference.bookmark[bm_name] = $(item).text().replace(/[\n\t\r]/ig, "");
+				$(this.#__doc).find('[bm]').each((index, item) => {
+					if (m = identityNormalize($(item).attr("bm"))) {
+						if (!this.#__bm) this.#__bm = {};
+						this.#__bm[m] = $(item).text().replace(/[\n\t\r]/g, "");
 					}
 				});
-				return reference;
-			} catch(err) {
-				return reference;
-			}
-			
+			} 
 		}
+
+		return this.#__doc;
 	}
+
+	async asyncReadDocument() {
+		return this.readDocument();
+	}
+
+	toString() {
+		return this.name;
+	}
+
+	static translateType(ref) {
+		if (typeof ref == 'string') {
+			if (!(ref = ref.trim())) return '';
 	
-	return null;
+			if (ref.length <= 2) {
+				switch (ref.toUpperCase()) {
+					case 'PC': return 'Processo';
+					case 'OF': return 'Ofício';
+					case 'IF': return 'Informe';
+					case 'AT': return 'Ato';
+					case 'EX': return 'Documento Externo';
+					case 'DP': return 'Despacho';
+					case 'CL': return 'Checklist';
+					case 'LC': return 'Licença';
+					case 'RL': return 'Relatório';
+					default: return 'Documento';
+				}
+			}
+	
+			ref = filterAccents(ref, String.prototype.toLowerCase);
+			switch (true) {
+				case /^[\d.-\/]{15,20}/i.test(ref): return 'PC';
+				case /^oficio/i.test(ref): return 'OF';
+				case /^informe/i.test(ref): return 'IF';
+				case /^ato/i.test(ref): return 'AT';
+				case /^despacho/i.test(ref): return 'DP';
+				case /^check/i.test(ref): return 'CL';
+				case /^licen[cç]a/i.test(ref): return 'LC';
+				case /^relat[oó]rio/i.test(ref): return 'RL';
+				default: return '';
+			}
+		}
+	
+		if (ref instanceof Element) {
+			if (ref.tagName != 'A') ref = ref.closest('a');
+			if (!ref) return false;
+			
+			let result = NodeSei.translateType(ref.text);
+			if (!result) {
+				let aid = $(ref).attr('id').replace(/\D/g, '');
+				if (aid && (aid = ref.ownerDocument.querySelector('icon' + aid)) && $(aid).attr('src').match(/pdf\./i)) return 'EX';
+			}
+			return result;
+		}
+	
+		return false;
+	}
 }
 
-//Referênncia para string
-function referenceToString(reference) {
+
+/**
+ * Consultar informações de nós da ávore Sei
+ * @param {(string | RegExp | Object)} [query] Se nada for informado, traz todos os nós da árvore atual do processo atual
+ * @param {OptionsQueryNodeSei} [options] Opções de consulta
+ * @returns {NodeSei} Resultado da consulta
+ */
+ async function queryNodeSei(query, options) {
+	var doc = (options && options.doc) || getFrameDocument("arvore");
+	if (!doc) throw new Error("Documento da árvore não encontrada");
+
+	var fetch = false;
+
+	if (typeof query == 'string' && query.match(/\d{5}\.?\d{6}\/(?:19|20)\d{2}(?:\-\d{2})?|\d{6,7}/)) {
+		fetch = true;
+		query = {sei: query};
+	} else fetch = typeof query == 'object' && query.sei && Object.keys(query).length == 1 && (query.sei = query.sei.toString()) && query.sei.match(/\d{5}\.?\d{6}\/(?:19|20)\d{2}(?:\-\d{2})?|\d{6,7}/);
+
+	if (fetch) {
+		query.sei = query.sei.replace(/\D/g, "");
+		let m, anchor, anchors = $(doc).find('a[id^=anchor][target=ifrVisualizacao]').get();
+		if (anchors && (anchor = anchors.find(a => m = $(a).text().match(/(?<=.*\(?)(\d{5}\.?\d{6}\/(?:19|20)\d{2}(?:\-\d{2})?|\d{6,7})\)?\s*$/) && m[1].replace(/\D/g, "") == query.sei))) return new NodeSei(anchor);
+	}
+
+	var tree = options && options.tree && Array.isArray(options.tree) && options.tree.length ? options.tree : [];
+	var node;
+	
+	if (!tree.length) {
+		var pastas = $(doc).find('#divArvore [id^="anchorPASTA"]').get();
+		var pinfo;
+		
+		while (pastas.length && !(query && (query === 'last' || query.last === true))) {
+			let pn = Number(pastas.shift().id.slice(11));
+			
+			if ($(doc).find(`#divArvore #anchorAGUARDE${pn}`).length) {
+				if (!pinfo) {
+					if (script = $(doc).find('script:contains("inicializar()")').text()) {
+						pinfo = [];
+						let m, regex = /Pastas\[(\d+)\]\s*[['".]{1,2}(\w+)[\]'".]{1,2}\s*=\s*['"](.+)['"]/gm;
+
+						while (m = regex.exec(script)) {
+							if (m.index === regex.lastIndex) regex.lastIndex++;
+							m[1] = Number(m[1]);
+							if (!pinfo[m[1]]) pinfo[m[1]] = [];
+							pinfo[m[1]][m[2]] = m[3];
+						}																						
+					}
+				}
+				
+				if (!pinfo[pn] || !pinfo[pn].link || !pinfo[pn].protocolos) return Promise.reject("Informação de pasta não encontrada");
+				
+				let data = 	await getAjaxContent(absoluteUrl(pinfo[pn].link),{method: "post", params: {hdnArvore: encodeURIComponent($(doc).find('#hdnArvore').val()),
+																									   hdnPastaAtual: `PASTA${pn}`,
+																									   hdnProtocolos: encodeURIComponent(pinfo[pn].protocolos)}});
+																			 
+					
+				if (!data) throw new Error(`Falha na consulta da pasta ${pn}.`);
+				
+				let regex_node = /(?<=Nos\[(\d+)\].*?=\s*new\s*infraArvoreNo\(\s*)(?:"DOCUMENTO"|"PROCESSO")\s*,\s*(?:"[^"]*?"\s*,?\s*|[\w\s]+\s*,?\s*)*?(?=\);)/ig;
+				let regex_src = /Nos\[\d+\]\.src.*?["']([^"']*)/i;
+				
+				while (node = regex_node.exec(data)) {
+					if (node.index === regex_node.lastIndex) regex_node.lastIndex++;
+					regex_src.lastIndex = regex_node.lastIndex;
+					let src = regex_src.exec(data);
+					if (src) node[0] += ',"' + (src[1] ?? "") + '"';
+					let d = new NodeSei(node[0]);
+					if (query && (query === "first" || query.first === true)) return d;
+					tree.push(d);
+				}						
+			}
+		}
+
+		$(doc).find('#divArvore a[id^=anchor][target=ifrVisualizacao]').each((index, item)=> {
+			let d = new NodeSei(item);
+			if (query && (query === "first" || query.first === true)) return d;
+			tree.push(d);
+		});
+
+		if (options && options.tree) options.tree = tree;
+	}
+	
+	if (!tree.length) return null;
+
+	if (query) {
+
+		let create_filter_function = (f) => {
+			if (typeof f == "string") {
+				f = f.trim();
+				if (f.match(/^(?:\d{5}\.?\d{6}\/(?:19|20)\d{2}(?:\-\d{2})?|\d{6,7})$/)) {
+					f = f.replace(/\D/g, "");
+					return (n) => n.sei == f;
+				}
+
+				if (f.match(/\$[a-z_]+\w*/i)) return (n) => testExpression(f, null, Object.freeze(n)); 
+
+				f = filterAccents(f.replace(/\s{2,}/g, " "));
+				let regex_filter = new RegExp(f, "i");
+				return (n) => regex_filter.test(filterAccents(n.name.replace(/\s{2,}/i, " ")));
+			} 
+			
+			if (f instanceof RegExp) return (n) => f.test(filterAccents(n.name));
+
+			if (typeof f == 'object') {
+				return (n) => {
+					for (let k of Object.keys(f)) 
+						if (f[k] === '?' && n[k]) continue;
+						else if (n[k] !== f[k]) return false;
+
+					return true;
+				};
+			}
+
+			return (n) => true;
+		};
+
+		
+		switch (typeof query) {
+			case "string":
+				if (query === 'first') return tree[0];
+				if (query === 'last') return tree[tree.length-1];
+				tree = tree.filter(create_filter_function(query));
+				break;
+			
+			case "number":
+				return tree[query];
+			
+			case "object":
+				if (query.first) {
+					if (typeof query.first == "boolean") return tree[0];
+					return tree.find(create_filter_function(query.first));
+				}
+
+				if (query.last) {
+					if (typeof query.last == "boolean") return tree[tree.length-1];
+
+					let filter = create_filter_function(query.last);
+					let i = tree.length - 1;
+					while (i >= 0) {
+						if (filter(tree[i])) return tree[i];
+						i--;
+					}
+					return null;
+				}
+
+				tree = tree.filter(create_filter_function(query));
+				break;
+		}
+	}
+
+	if (fetch && !tree.length) {
+		let form = top.window.document.getElementById('frmProtocoloPesquisaRapida') || (window.opener && window.opener.top.document.getElementById("frmProtocoloPesquisaRapida"));
+		if (form) {
+			let data = 	await getAjaxContent(absoluteUrl(form.getAttribute("action")), {method: "post", params: {txtPesquisaRapida: query.sei.replace(/\D/g,"")}});
+			if (data) {
+				let parser = new DOMParser();
+				let data_doc = parser.parseFromString(data, "text/html");
+				return data_doc && queryNodeSei(query, {doc: data_doc});
+			}
+		}
+		return null;
+	}
+	
+	return tree.length ? (tree.length == 1 ? tree[0] : tree) : null;
+}
+
+
+
+/**
+ * Retornar informações do nó selecionado no processo 
+ * @returns {NodeSei} Objeto com informações da referência
+ */
+ function getCurrentNodeSei() {
+	try {
+		return new NodeSei((arvore = getFrameDocument("arvore")) && $(arvore).find('.infraArvoreNoSelecionado').closest('a').get(0));
+	} catch (err) {
+		return null;
+	}
+}
+
+
+/**
+ * Converte dados em objeto referência
+ * @param {(string | NodeSei)} data Dado que será convertido em objeto referência
+ * @returns {Reference} Resultado da conversão
+ */
+function referenceFromData(data) {
+	if (!data) return null;
+
+	if (typeof data === 'string') { 
+		const regex = /ref\.(?:([^.;]*?)\.)?([^=;]*?)\s*=\s*([^;]*?)\s*;/gi;
+		let result = undefined;
+	
+		while ((m = regex.exec(data)) !== null) {
+			if (m.index === regex.lastIndex) regex.lastIndex++;
+			if (!result) result = {};
+	
+			if (m[1]) {
+				if (!result[m[1]]) result[m[1]] = {};
+				result[m[1]][m[2]] = m[3];
+			} else result[m[2]] = m[3];
+		}
+		
+		return result;
+	} 
+
+	if (data instanceof NodeSei) {
+		let fields = {name: "nome", type: "tipo", tipology: "tipologia", sei: "sei", id: "id", extern: "externo", date: "data", bm: "bm", fullName: "nomeCompleto"};
+		let result = {};
+		for(let k of Object.keys(fields)) result[fields[k]] = data[k];
+		if (typeof result.data === 'string') result.ano = result.data.slice(-4);
+		return result;
+	}
+}
+
+
+/**
+ * Converter objeto referência para string 
+ * @param {Reference | NodeSei} reference Objeto referência a ser convertido
+ * @returns {String} Resultado da conversão
+ */
+ function referenceToString(reference) {
+	if (!reference) return "";
+
 	let result = "";
+	if (reference instanceof NodeSei) reference = referenceFromData(reference);
 	
 	for (let name in reference) {
 		if (reference.hasOwnProperty(name)) {
-			
 			if (typeof reference[name] == "object") {
 				for (let prop in reference[name]) {
-					if (reference[name].hasOwnProperty(prop)) {
-						if (name == "bookmark") result += `ref.bm.${prop}=${reference[name][prop]};`;
-						else result += `ref.${name}.${prop}=${reference[name][prop]};`;
-					}
+					if (reference[name].hasOwnProperty(prop)) result += `ref.${name}.${prop}=${reference[name][prop]};`;
 				}
 			} else result += `ref.${name}=${reference[name]};`;
 		}
@@ -769,28 +1152,6 @@ function referenceToString(reference) {
 	return result;
 }
 
-
-//Interpretar string para referências
-function referencesFromString(text) {
-	if (!text) return undefined;
-	
-	const regex = /ref\.(?:([^.;]*?)\.)?([^=;]*?)\s*=\s*([^;]*?)\s*;/gi;
-	let result = undefined;
-
-	while ((m = regex.exec(text)) !== null) {
-		if (m.index === regex.lastIndex) regex.lastIndex++;
-		if (!result) result = {};
-		
-		if (m[1] && m[1] == "bm") m[1] = "bookmark";
-
-		if (m[1]) {
-			if (!result[m[1]]) result[m[1]] = {};
-			result[m[1]][m[2]] = m[3];
-		} else result[m[2]] = m[3];
-	}
-	
-	return result;
-}
 
 
 //Retornar campo(s) do processo corrente 
@@ -916,6 +1277,13 @@ function formatValue(value, format) {
 		case "low": return value.toLowerCase();
 		case "num": return value.replace(/\D/g,"");
 		case "ano": return (d = value.toString().toDate()) ? d.getFullYear() : "0";
+		case "ext": 
+			let md;
+			if (md = value.match(/(\d{2})\/(\d{2})\/(\d{4})/)) {
+				let mes = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+				return `${Number(md[1])} de ${mes[Number(md[2])-1]} de ${md[3]}`;
+			} else return value;
+
 		default: return extractString(value, format);
 	}
 }
@@ -1052,149 +1420,6 @@ function getCurrentProcInfo() {
 	
 	return result;
 }
-
-//Informações de documento na árvore SEI
-//Opções de filtro: <num_sei> | <identificação_do_documento> | {first,last,until,all,length,offset}
-async function getDocumentoInfo(filter, cache) {
-	var doc = getFrameDocument("arvore");
-	if (!doc) return Promise.reject("Documento da árvore não encontrada");
-	
-	var tree = cache && cache.tree && Array.isArray(cache.tree) && cache.tree.length ? cache.tree : [];
-	var node;
-	
-	if (!tree.length) {
-		var pastas = $(doc).find('#divArvore [id^="anchorPASTA"]').get();
-		var pinfo;
-		
-		var add_node_fn = (text, href, active) => {
-			if (m = text.match(/^\s*(\d{5}\.\d{6}\/\d{4}\-\d{2})\s*$|^\s*(([^\s]+)[^\d]*(\b\d+\b)?.*)\s+\(?(\d+)\)?\s*$/)) 
-				tree.push(m[1] ? {id: m[1], tipo: "processo", sei: m[1].replace(/\D/g,""), href: href, ativo: active == true} : {id: m[2], desc: m[3], tipo: filterAccents(m[3], String.prototype.toLowerCase), num: m[4], sei: m[5], href: href, ativo: active == true});
-		};
-		
-		while (pastas.length) {
-			//let pn = Number(pastas.pop().id.slice(11));
-			let pn = Number(pastas.shift().id.slice(11));
-			
-			if ($(doc).find(`#divArvore #anchorAGUARDE${pn}`).length) {
-				if (!pinfo) {
-					if (script = $(doc).find('script:contains("inicializar()")').text()) {
-						pinfo = [];
-						let m, regex = /Pastas\[(\d+)\]\s*[['".]{1,2}(\w+)[\]'".]{1,2}\s*=\s*['"](.+)['"]/gm;
-
-						while (m = regex.exec(script)) {
-							if (m.index === regex.lastIndex) regex.lastIndex++;
-							m[1] = Number(m[1]);
-							if (!pinfo[m[1]]) pinfo[m[1]] = [];
-							pinfo[m[1]][m[2]] = m[3];
-						}																						
-					}
-				}
-				
-				if (!pinfo[pn] || !pinfo[pn].link || !pinfo[pn].protocolos) return Promise.reject("Informação de pasta não encontrada");
-				
-				let data = 	await getAjaxContent(absoluteUrl(pinfo[pn].link),{method: "post", params: {hdnArvore: encodeURIComponent($(doc).find('#hdnArvore').val()),
-																									   hdnPastaAtual: `PASTA${pn}`,
-																									   hdnProtocolos: encodeURIComponent(pinfo[pn].protocolos)}});
-																			 
-					
-				if (!data) return Promise.reject("Falha na consulat de pastas");
-				
-				let regex_node = /Nos\[\d+\].*?=\s*?new\s*?infraArvoreNo\s*?\("([^"]+)"\s*,\s*"(\d+)".*?"(controlador.php[^"]*?)".*?ifrVisualizacao\s*"\s*,\s*"([^"]*?)"/ig;
-				
-				while (node = regex_node.exec(data)) {
-					if (node.index === regex_node.lastIndex) regex_node.lastIndex++;
-					add_node_fn(node[4], node[3]);
-				}						
-			}
-		}
-
-		$(doc).find('#divArvore a[id^=anchor][target=ifrVisualizacao]').each((index, item)=> {add_node_fn(item.innerText, item.getAttribute("href"), $(item).find('.infraArvoreNoSelecionado').length > 0)});
-		
-		if (cache != undefined) cache.tree = tree;
-	}
-	
-	if (!tree.length) return null;
-	if (filter) {
-		
-		let filter_callback = (f) => {
-			if (typeof f == "number") f = f.toString();
-			if (f === true || f == "current" || f == "active") return (n) => n.active; 
-			if (typeof f == "string") {
-				f = f.trim();
-				if (f.match(/^\d{7}$/)) return (n) => n.sei == f;
-				f = filterAccents(f.replace(/\s{2,}/g, " "));
-				let regex_filter = new RegExp(f, "i");
-				return (n) => regex_filter.test(filterAccents(n.id.replace(/\s{2,}/g, " ")));
-			} 
-			
-			if (filter instanceof RegExp) return (n) => {filter.test(filterAccents(n.id))};
-			
-			return null;
-		};
-		
-		if (typeof filter == "string") {
-			switch (filter.trim().toLowerCase()) {
-				case "first": return tree[0];
-				case "last": return tree[tree.length-1];
-			}
-		}
-		
-		if (fn = filter_callback(filter)) tree = tree.filter(fn);
-		else if (typeof filter == "object") {
-			let result = [];
-			
-			if (filter.first) {
-				if (filter.first == "any" || filter.first == "*") {
-					filter.first = true;
-					filter.all = true;
-				} else if (filter.first !== true) filter.first = filter_callback(filter.first);
-			} 
-			if (filter.last) {
-				if (filter.last == "any" || filter.last == "*") {
-					filter.last = true;
-					filter.all = true;
-				} else if (filter.last !== true) filter.last = filter_callback(filter.last);
-			} 
-			if (filter.until) filter.until = filter_callback(filter.until);
-			if (filter.length) filter.all = true;
-			
-			if (filter.first) {
-				
-				for (let node of tree) {
-					if (filter.until && filter.until(node)) break;
-					if (filter.first === true || filter.first(node)) {
-						if (filter.offset) {
-							filter.offset--;
-							continue;
-						}
-						if (!filter.all) return node;
-						result.push(node);
-						if (filter.length && result.length == filter.length) break;
-					}
-				}
-			} else if (filter.last) {
-				for (i = tree.length-1; i >= 0; i--) {
-					if (filter.until && filter.until(tree[i])) break;
-					if (filter.last === true || filter.last(tree[i])) {
-						if (filter.offset) {
-							filter.offset--;
-							continue;
-						}
-						if (!filter.all) return tree[i];
-						result.unshift(tree[i]);
-						if (filter.length && result.length == filter.length) break;
-					}
-				}
-			}
-			
-			tree = result;
-		}
-	}
-	
-	
-	return tree.length == 1 ? tree[0] : tree.length > 1 ? tree : null;
-}
-
 
 
 
@@ -1423,12 +1648,14 @@ function addCommand(id, icon, title, list, callback) {
 
 		btn = document.createElement('a');
 		btn.id = id;
-		btn.className = "botaoSEI";
+		// btn.className = "botaoSEI";
 		btn.href = "javascript:void(0);";
 		btn.setAttribute("tabindex", "452");
 
+		let first_img = div_commands.querySelector('img');
+
 		var img = document.createElement("img");
-		img.className = "infraCorBarraSistema";
+		if (!first_img || $(first_img).is('.infraCorBarraSistema')) img.className = "infraCorBarraSistema";
 		
 		btn.appendChild(img);
 		
@@ -1444,6 +1671,27 @@ function addCommand(id, icon, title, list, callback) {
 }
 
 
+/***** INTEGRAÇÃO COM A SUITE CFOR *****/
+async function addControlePagto(fistel, processo, servico, debitos, nome) {
+	fistel = fistel && fistel.replace(/\D/g,",") && fistel.split(",").filter(item => validateFistel(item)).join(",");
+	processo = processo && processo.replace(/\D/g, "");
+	
+	if (!fistel || !processo) throw "Fistel ou Número de Processo inválido";
+	
+	servico = servico && servico.toString().replace(/\D/g,"").padStart(3,"0");
+	
+	return addCpag(processo, servico, fistel).then(result => console.log("OK: ", result)).catch(err => console.log("ERROR: ", err));
+	
+	/*
+	if (debitos === true) debitos = "t";
+	else if (typeof debitos == "string" && debitos.length) debitos = debitos[0].toLowerCase();
+	else throw "Tipo de débitos inválido"
+	
+	browser.runtime.sendMessage({action: "popup", url: getCforUrl(`cpag/cfor-ext.php?acao=incluir&processo=${processo}&servico=${servico}&fistel=${fistel}&debitos=${debitos}&nome=${nome}`), options: {width: 540, height: 220}});
+	*/
+	return true;
+}
+
 
 /***** ATUALIZAÇÕES DOS PAINÉIS ******/
 //Aplicar ações de painel
@@ -1457,47 +1705,31 @@ function applyActionPanel(items) {
 								 condition: function(e) {return !testFieldNames($(e.currentTarget).closest('.proc-field').attr('field-name'), /\bfistel\b/i) && validateCpfj($(this).text())}, 
 								 callback: async function(e) {
 											   let cpfj = $(this).text().replace(/\D/g,"");
-											   setClipboard(cpfj);
 		
-											   let urls = [`http://sistemasnet/sigec/ConsultasGerais/SituacaoCadastral/tela.asp?acao=c&NumCNPJCPF=${cpfj}&indTipoComparacao=e&hdnImprimir=true`,
-												           `http://sistemasnet/sigec/ConsultasGerais/NadaConsta/certidao.asp?CND=1&ValidaSistema=SIGEC&NumCNPJCPF=${cpfj}&acao=c&cmd`]; 
-
-												if (cpfj.length == 11) {
-													waitMessage("Consultando data de nascimento...");
-													let nasc = await consultarEntidade(cpfj).then(cadastro => cadastro.nascimento).catch(err => null);
-													waitMessage(null);
-
-													nasc = nasc || await openFormDlg([{id: "nasc", type: "date", label: "Data de Nascimento", required: true, value: default_nasc ?? ""}], "Consulta").then(data => data.nasc).catch(err => null);														   
-													
-													if (nasc) urls.push(`https://servicos.receita.fazenda.gov.br/Servicos/CPF/ConsultaSituacao/ConsultaPublica.asp?CPF=${cpfj}&NASCIMENTO=${nasc}`); 
-													else urls.push(`https://servicos.receita.fazenda.gov.br/Servicos/CPF/ConsultaSituacao/ConsultaPublica.asp?CPF=${cpfj}`); 
-													
-												} else {
-													urls.push(`http://www.receita.fazenda.gov.br/PessoaJuridica/CNPJ/cnpjreva/cnpjreva_solicitacao2.asp?CNPJ=${cpfj}`); 
-													// urls.push(`http://servicos.receita.fazenda.gov.br/Servicos/certidao/CndConjuntaInter/InformaNICertidao.asp?Tipo=1&NI=${cpfj}`); 
-													urls.push(`http://www.portaltransparencia.gov.br/sancoes/ceis?paginacaoSimples=true&tamanhoPagina=&offset=&direcaoOrdenacao=asc&colunasSelecionadas=linkDetalhamento%2CcpfCnpj%2Cnome%2CufSancionado%2Corgao%2CtipoSancao%2CdataPublicacao&cpfCnpj=${cpfj}&ordenarPor=nome&direcao=asc`); 
-												}
-												
-											   
-											   browser.runtime.sendMessage({action: "open", url: urls});
-					  				       }
-								},
-
-								{action: "sit", 
-								 icon: "icon-anatel", 
-								 title: "Consultar Situação Anatel", 
-								 condition: function(e) {return !testFieldNames($(e.currentTarget).closest('.proc-field').attr('field-name'), /\bfistel\b/i) && validateCpfj($(this).text())}, 
-								 callback: async function(e) {
-											   let cpfj = $(this).text().replace(/\D/g,"");
 											   setClipboard(cpfj);
 		
 											   let urls = [`http://sistemasnet/sigec/ConsultasGerais/SituacaoCadastral/tela.asp?acao=c&NumCNPJCPF=${cpfj}&indTipoComparacao=e&hdnImprimir=true`];
 											   
-											   browser.runtime.sendMessage({action: "open", url: urls});
-					  				       }
-								},
-										   
+											   if (!e.ctrlKey) {
+												   urls.push(`http://sistemasnet/sigec/ConsultasGerais/NadaConsta/certidao.asp?CND=1&ValidaSistema=SIGEC&NumCNPJCPF=${cpfj}&acao=c&cmd`); 
 
+												   if (cpfj.length == 11) {
+													  let nasc = /*e.altKey && */await openFormDlg([{id: "nasc", type: "date", label: "Data de Nascimento", required: true}], "Consulta").then(data => data.nasc).catch(err => null);														   
+													  
+													  if (nasc) urls.push(`https://servicos.receita.fazenda.gov.br/Servicos/CPF/ConsultaSituacao/ConsultaPublica.asp?CPF=${cpfj}&NASCIMENTO=${nasc}`); 
+													  else urls.push(`https://servicos.receita.fazenda.gov.br/Servicos/CPF/ConsultaSituacao/ConsultaPublica.asp?CPF=${cpfj}`); 
+													   
+												   } else {
+													   urls.push(`http://www.receita.fazenda.gov.br/PessoaJuridica/CNPJ/cnpjreva/cnpjreva_solicitacao2.asp?CNPJ=${cpfj}`); 
+													   //urls.push(`http://servicos.receita.fazenda.gov.br/Servicos/certidao/CndConjuntaInter/InformaNICertidao.asp?Tipo=1&NI=${cpfj}`); 
+													   urls.push(`http://www.portaltransparencia.gov.br/sancoes/ceis?paginacaoSimples=true&tamanhoPagina=&offset=&direcaoOrdenacao=asc&colunasSelecionadas=linkDetalhamento%2CcpfCnpj%2Cnome%2CufSancionado%2Corgao%2CtipoSancao%2CdataPublicacao&cpfCnpj=${cpfj}&ordenarPor=nome&direcao=asc`); 
+												   }
+												   
+											   }
+											   
+											   browser.runtime.sendMessage({action: "open", url: urls});
+										   }},
+										   
 								{action: "consultar-user-sei", 
 								 icon: "icon-user-sei", 
 								 title: "Consultar Usuário Externo", 
@@ -1549,31 +1781,27 @@ function applyActionPanel(items) {
 										   
 								{action: "consultar-anac", 
 								 icon: "icon-anac", 
-								 title: "Consultar RAB ANAC", 
+								 title: "Consultar ANAC", 
 								 condition: function(e) {return testFieldNames($(e.currentTarget).closest('.proc-field').attr('field-name'), /\bindicativo\b/i) && $('#hdnServico').val() == "507" && $(this).text().match(/\s*P[PRSTU][A-Z]{3}\s*/i)}, 
 								 callback: async function(e) {
 											   let indicativo = $(this).text().trim();
+											   waitMessage("Abrindo sistemas da ANAC...");
 
-											   if (e.ctrlKey) {											   											   
-													try {
-														waitMessage("Abrindo sistemas da ANAC...");
-														browser.runtime.sendMessage({action: "open", url: "https://sistemas.anac.gov.br/SACI/SIAC/Aeronave/Estacao/Consulta.asp", script: `
-															sessionStorage.predata_siac = JSON.stringify({indicativo: "${indicativo}", timestamp: Date.now()});
-															/*var marca = document.querySelector('input[name=txtMarca]');
-															if (marca) {
-																sessionStorage.removeItem("predata_siac");
-																marca.value = "${indicativo}";
-																var form = document.querySelector('form[name=frmAeronave]');
-																if (form) form.submit();
-															}*/`, runAt: "document_start"});
-
-															waitMessage();
-													} catch(err) {
-														waitMessage();
-														errorMessage(err);
-													}
-												} else {
-											   		browser.runtime.sendMessage({action: "open", url: `https://sistemas.anac.gov.br/aeronaves/cons_rab_print.asp?nf=${indicativo}`});
+											   											   
+											   try {
+													browser.runtime.sendMessage({action: "open", url: "https://sistemas.anac.gov.br/SACI/SIAC/Aeronave/Estacao/Consulta.asp", script: `
+													sessionStorage.predata_siac = JSON.stringify({indicativo: "${indicativo}", timestamp: Date.now()});
+													/*var marca = document.querySelector('input[name=txtMarca]');
+													if (marca) {
+														sessionStorage.removeItem("predata_siac");
+														marca.value = "${indicativo}";
+														var form = document.querySelector('form[name=frmAeronave]');
+														if (form) form.submit();
+													}*/`, runAt: "document_start"});
+												    waitMessage();
+											   } catch(err) {
+												   waitMessage();
+												   errorMessage(err);
 											   }
 										   }},
 										   

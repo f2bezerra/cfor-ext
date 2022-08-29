@@ -48,152 +48,60 @@ function addNovo() {
 		} else return;
 	}
 	
-	let reference = getCurrentReference();
-	
-	let items = [{text: "Externo", items: [
-						{id: "ext-reg", text: "Consulta de Regularidade"}, 
-						{id: "ext-lic", text: "Licenças Impressas"}, 
-						{id: "ext-coer", text: "COER"}, 
-						{id: "ext-rab", text: "Consulta de RAB"}, 
-						{id: "rel-sis", text: "Relatório de ..."}, 
-						{id: "reg-vis", text: "Registro de Visão"}, 
-						{id: "ext-lan", text: "Extrato de Lançamentos"},
-						{id: "ext-pub", text: "Publicação DOU"}]}, 
-				 "-",
-				 {id: "checklist", text: "Lista de Verificação"},
-				 {id: "analise", text: "Análise Técnica"},
-				 {id: "boletos", text: "Boletos", tip: "Gerar Ofício de Notificação de Boletos"},
-				 {id: "licenca", text: "Licença", tip: "Gerar Ofício de Encaminhamento de Licenças", icon: (reference.tipo == "licenca"?"menu-favorite-icon":undefined)},
-				 {id: "autocad", text: "Autocadastramento", tip: "Gerar Ofício de Deferimento de Autocadastramento"},
-				 {id: "exigencia", text: "Exigência", tip: "Gerar Ofício de Exigência", icon: (reference.tipo == "check"||reference.tipo == "oficio"?"menu-favorite-icon":undefined)},
-				 {id: "informe", text: "Informe", tip: "Gerar informe genérico"},
-				 {id: "ato", text: "Ato", tip: "Gerar ato genérico"},
-				 {id: "certidao", text: "Certidão", tip: "Gerar certidão padrão"},
-				 "-",
-				 {id: "deferimento", text: "Deferimento", tip: "Ofício de Deferimento", icon: "menu-deferido-icon"},
-				 {id: "indeferimento", text: "Indeferimento", tip: "Ofício de Indeferimento", icon: (reference.tipo == "oficio"?"menu-favorite-icon":undefined)},
-				 {id: "arquivamento", text: "Arquivamento", tip: "Despacho de Arquivamento"}];
+
+	let cfor_settings;
+	$.ajax({url: browser.runtime.getURL('default-settings.json'), async: false, dataType: 'json', success: response => cfor_settings = response});
+
+	let info = getCurrentProcInfo();
+	let reference = referenceFromData(getCurrentNodeSei());
+	let variables = {hoje: new Date().toDateBR(), info: Object.freeze(info), ref: Object.freeze(reference)};
+	let items = [];
 				 
 	let url_clonado;			 
-	if ($('#divArvoreAcoes a[href*="acao=protocolo_modelo_cadastrar"]').length && (url_clonado = $('#divArvoreAcoes a[href*="acao=documento_alterar"]').attr('href'))) {
-		items.unshift({id: "clone", text: "Clonar documento", icon: "menu-copy-icon"}, "-");
+	if (/*$('#divArvoreAcoes a[href*="acao=protocolo_modelo_cadastrar"]').length && */(url_clonado = $('#divArvoreAcoes a[href*="acao=documento_alterar"]').attr('href'))) {
+		items.push({id: "clone", text: "Clonar documento", icon: "menu-copy-icon"}, "-");
 	}
 	
-	if (reference && reference.tipo == "ato") {
-		items.splice(items.findIndex((item) => {return item.id == "ato"}) + 1, 0, {id: "extincao", text: "Extinção", tip: "Gerar Ofícios de Notificação de Extinção", icon: "menu-favorite-icon"});
-	} 
+	for (let item of cfor_settings.hacks.new_docs) {
+		if (item.visibility !== undefined && !solve(item.visibility, null, variables)) continue; 
+					
+		let path = item.menu.split("/");
+		let root = items;
+		let menu;
 
-	createPopupMenu(btn, items, {dropButton: "menu-drop-button", useTip: true, tipText: "Gerar $0"}, function(e) {
-
-		let info = getCurrentProcInfo();
+		while (path.length > 1) {
+			if (path[0] == "-") root.push("-");
+			else {
+				if (menu = root.find(m => m.text == path[0])) {
+					if (!menu.items) menu.items = [];
+				} else {
+					menu = {text: path[0], items: []};
+					root.push(menu);
+				}
+				root = menu.items;
+			}
+			path.shift();
+		}
+					
+		if (path[0] == "-") {
+			root.push("-");
+			continue;
+		}
+					
+		menu = {text: path[0], data: item};
+		if (item.title) menu.tip = item.title;
+		if (item.favorite !== undefined && solve(item.favorite, null, variables)) menu.icon = "menu-favorite-icon";
+		root.push(menu);
+	}
+					
+	createPopupMenu(btn, items, {dropButton: "menu-drop-button", useTip: true, tipText: "Gerar $0", dropButtonTitle: "Criação rápida de documentos"}, function(e) {
+					
 		let url_tipo = absoluteUrl($('#divArvoreAcoes a[href*="acao=documento_escolher_tipo"]').attr("href"));
-		reference = getCurrentReference();
-	
+					
 		$.get(url_tipo, function(data) {
 			let url, predata = {}, $html = $(data);
-			
-			switch (e.id) {
-				case "checklist": 
-					url = $html.find("[data-desc='check list de analise'] .ancoraOpcao").attr("href");
-					predata.txtpad = "O-Checklist";
-					predata.acesso = 0;
-					predata.autoconfirm = true;
-					break;
-
-				case "analise": 
-					url = $html.find("[data-desc='check list de analise'] .ancoraOpcao").attr("href");
-					predata.txtpad = "O-Análise_Técnica";
-					predata.acesso = 0;
-					predata.autoconfirm = true;
-					break;
 					
-				case "boletos": 
-					url = $html.find("[data-desc='oficio'] .ancoraOpcao").attr("href");
-					predata.txtpad = "O-Boletos";
-					predata.acesso = 2;
-					predata.autoconfirm = true;
-					break;
-					
-				case "licenca": 
-					url = $html.find("[data-desc='oficio'] .ancoraOpcao").attr("href");
-					predata.txtpad = "O-Licença";
-					predata.acesso = "auto";
-					if (reference && reference.tipo == "licenca") predata.reference = reference;
-					predata.autoconfirm = true;
-					break;
-					
-				case "exigencia": 
-					url = $html.find("[data-desc='oficio'] .ancoraOpcao").attr("href");
-					predata.txtpad = "O-Exigência";
-					predata.acesso = "auto";
-					if (reference && (reference.tipo == "check" || reference.tipo == "oficio")) predata.reference = reference;
-					predata.autoconfirm = true;
-					
-					break;
-
-				case "autocad": 
-					url = $html.find("[data-desc='oficio'] .ancoraOpcao").attr("href");
-					predata.txtpad = "O-Def_Autocad";
-					predata.acesso = "auto";
-					predata.autoconfirm = true;
-					break;
-					
-				case "deferimento": 
-					url = $html.find("[data-desc='oficio'] .ancoraOpcao").attr("href");
-					predata.txtpad = "O-Deferimento";
-					predata.acesso = "auto";
-					if (reference && reference.tipo == "oficio") predata.reference = reference;
-					predata.autoconfirm = true;
-					
-					break;
-
-				case "indeferimento": 
-					url = $html.find("[data-desc='oficio'] .ancoraOpcao").attr("href");
-					predata.txtpad = "O- Indeferimento";
-					predata.acesso = "auto";
-					if (reference && reference.tipo == "oficio") predata.reference = reference;
-					predata.autoconfirm = true;
-					
-					break;
-					
-				case "arquivamento": 
-					url = $html.find("[data-desc='despacho ordinatorio'] .ancoraOpcao").attr("href");
-					predata.txtpad = "O-Despacho";
-					predata.acesso = 0;
-					predata.autoconfirm = true;
-					
-					break;					
-					
-				case "extincao": 
-					url = $html.find("[data-desc='oficio'] .ancoraOpcao").attr("href");
-					predata.txtpad = "O-Notificação_extinção";
-					predata.acesso = "auto";
-					if (reference && (reference.tipo == "ato")) predata.reference = reference;
-					predata.autoconfirm = true;
-					
-					break;
-					
-				case "informe": 
-					url = $html.find("[data-desc='informe'] .ancoraOpcao").attr("href");
-					predata.reference = reference;
-					predata.acesso = 0;
-					break;
-
-				case "ato": 
-					url = $html.find("[data-desc='ato'] .ancoraOpcao").attr("href");
-					predata.reference = reference;
-					predata.acesso = 0;
-					break;
-					
-				case "certidao": 
-					url = $html.find("[data-desc='certidao'] .ancoraOpcao").attr("href");
-					predata.txtpad = "O- Certidão";
-					predata.acesso = 0;
-					predata.autoconfirm = true;
-					
-					break;					
-					
-				case "clone":
+			if (e.id == "clone") {
 					if (!reference) return;
 					
 					$.get(absoluteUrl(url_clonado), (data_clonado) => {
@@ -221,78 +129,20 @@ function addNovo() {
 						}
 					});				
 					return;
+			}
 					
-				case "ext-reg":
+			if (e.data.upload) {
 					url = $html.find("[data-desc*=externo] .ancoraOpcao").attr("href");
-					predata.tipo = "Consulta";
-					predata.desc = "de Regularidade";
-					predata.acesso = "auto";
+				predata.tipo = e.data.type;
+				if (e.data.description) predata.desc = solve(e.data.description, null, variables);
+				predata.acesso = e.data.access;
 					predata.upload = true;
-					break;
-
-				case "ext-sis":
-					url = $html.find("[data-desc*=externo] .ancoraOpcao").attr("href");
-					predata.tipo = "Consulta";
-					predata.desc = "de Sistema";
-					predata.acesso = "auto";
-					predata.upload = true;
-					break;
-					
-				case "ext-lan":
-					url = $html.find("[data-desc*=externo] .ancoraOpcao").attr("href");
-					predata.tipo = "Extrato";
-					predata.desc = "de Lançamentos";
-					predata.acesso = 2;
-					predata.upload = true;
-					break;
-					
-				case "ext-pub":
-					url = $html.find("[data-desc*=externo] .ancoraOpcao").attr("href");
-					predata.tipo = "Publicação";
-					predata.desc = "DOU de " + (new Date()).addDate(0).toDateBR();
-					predata.acesso = 0;
-					predata.upload = true;
-					break;
-					
-				case "rel-sis":
-					url = $html.find("[data-desc*=externo] .ancoraOpcao").attr("href");
-					predata.tipo = "Relatório";
-					predata.desc = "de ";
-					predata.acesso = 2;
-					predata.upload = true;
-					break;
-
-				case "reg-vis":
-					url = $html.find("[data-desc*=externo] .ancoraOpcao").attr("href");
-					predata.tipo = "Registro";
-					predata.desc = "de Chamado para Suporte de TI";
-					predata.acesso = 1;
-					predata.upload = true;
-					break;
-
-				case "ext-lic":
-					url = $html.find("[data-desc*=externo] .ancoraOpcao").attr("href");
-					predata.tipo = "Licença";
-					if (info && info.indicativo) predata.desc =  info.indicativo;
-					predata.acesso = 2;
-					predata.upload = true;
-					break;
-					
-				case "ext-coer":
-					url = $html.find("[data-desc*=externo] .ancoraOpcao").attr("href");
-					predata.tipo = "Certificado";
-					predata.desc = "de Operador de Estação de Radioamador";
-					predata.acesso = 1;
-					predata.upload = true;
-					break;
-					
-				case "ext-rab":
-					url = $html.find("[data-desc*=externo] .ancoraOpcao").attr("href");
-					predata.tipo = "Consulta";
-					predata.desc = "ao RAB" + (info && info.indicativo ? " - " + info.indicativo : "");
-					predata.acesso = "auto";
-					predata.upload = true;
-					break;
+			} else {
+				url = $html.find(`[data-desc='${e.data.type}'] .ancoraOpcao`).attr("href");
+				if (e.data.template) predata.txtpad = e.data.template;
+				predata.acesso = e.data.access;
+				predata.autoconfirm = e.data.auto_confirm;
+				if (e.data.reference && solve(e.data.reference, null, variables)) predata.reference = reference;
 			}
 			
 			if (url && (ifr = window.top.document.getElementById("ifrVisualizacao"))) {
@@ -318,7 +168,7 @@ function addAlterarDoc() {
 	createPopupMenu(btn, [{id: "na_restrito_pes", text: parseMarkdown("Alterar para Nível de Acesso **Restrito: Pessoal**"), icon: "menu-key-icon"},
 						  {id: "na_restrito_eco", text: parseMarkdown("Alterar para Nível de Acesso **Restrito: Econômica**"), icon: "menu-key-icon"},
 						  "-",
-	                      {id: "na_publico", text: parseMarkdown("Alterar para Nível de Acesso **Público**"), icon: "menu-share-icon"}], {dropButton: "menu-drop-button"}, async e => {
+	                      {id: "na_publico", text: parseMarkdown("Alterar para Nível de Acesso **Público**"), icon: "menu-share-icon"}], {dropButton: "menu-drop-button", dropButtonTitle: "Alteração rápida de nível de acesso"}, async e => {
 		
 		let acesso = e.id == "na_publico" ? 0 : e.id == "na_restrito_pes" ? 1 : 2;
 		let str_acesso = ["Público", "Restrito (Info. Pessoal)", "Restrito (Info. Econômica)"];
@@ -356,7 +206,7 @@ function addPPC() {
 						  {id: "ppc:ame", text: "PPC: Aguardando Manifestação Externa"}, "-",
 						  {id: "send", text: "Encaminhar para ... e concluir"}, 
 						  {id: "text", text: `Devolver ${user?user.login:""}`},
-						  {id: "text", text: "Concluir"}], {dropButton: "menu-drop-button"}, e => {
+						  {id: "text", text: "Concluir"}], {dropButton: "menu-drop-button", dropButtonTitle: "Anotação rápida"}, e => {
 		let result;
 		
 		switch (e.id) {
@@ -387,12 +237,12 @@ function addBlocoAssinatura() {
 	var btn = $('#divArvoreAcoes a[href*="acao=bloco_escolher"]').get(0);
 	if (!btn) return;
 	
-	var reference = getCurrentReference();
+	var reference = getCurrentNodeSei();
 	if (!reference) return;
 	
-	let msg_success = `Documento "${reference.name}" INCLUÍDO com sucesso`;
+	let msg_success = `${reference.name} INCLUÍDO com sucesso`;
 
-	createPopupMenu(btn, [{id: "encaminhar", text: "Encaminhar para assinatura", icon: "menu-send-icon"},"-",{id: "marcar", text: "Marcar como Encaminhado para assinatura", icon: "extension://assets/flag.svg"}], {dropButton: "menu-drop-button"}, e => {
+	createPopupMenu(btn, [{id: "encaminhar", text: "Encaminhar para assinatura", icon: "menu-send-icon"},"-",{id: "marcar", text: "Marcar como Encaminhado para assinatura", icon: "extension://assets/flag.svg"}], {dropButton: "menu-drop-button", dropButtonTitle: "Ações rápidas de Bloco de Assinatura"}, e => {
 		
 		if (e.id == "marcar") {
 			setPontoControle("assinatura").then(msg => notify("success", "Marcado ponto de controle com SUCESSO!")).catch(error => notify("fail", error));
@@ -400,7 +250,7 @@ function addBlocoAssinatura() {
 		}
 		
  		new Promise((resolve, reject) => {
-			waitMessage(`Incluindo documento **${reference.name}** no bloco de assinatura...`);
+			waitMessage(`Incluindo **${reference.name}** no bloco de assinatura...`);
 			
 			let url = $(btn).attr('href');
 
@@ -410,8 +260,8 @@ function addBlocoAssinatura() {
 				
 				let expr_bloco, desc_bloco, disp_bloco, anota_bloco, hoje = new Date().toLocaleDateString("pt-BR");
 				
-				switch (reference.tipo) {
-					case "oficio": 
+				switch (reference.type) {
+					case "OF": 
 						expr_bloco = "of[ií]cios?"; 
 						desc_bloco = "Ofícios " + hoje;
 
@@ -420,22 +270,22 @@ function addBlocoAssinatura() {
 
 						break;
 
-					case "ato": 
-					case "informe": 
+					case "AT": 
+					case "IF": 
 						expr_bloco = "atos?\\s+e\\s+informes?"; 
 						desc_bloco = "Atos e Informes " + hoje;
 						disp_bloco = "gr05";
 						break;
 						
-					case "despacho": 
-					case "memorando": 
+					case "DP": 
+					case "MM": 
 						expr_bloco = "despachos?\\s+e\\s+memorandos?"; 
 						desc_bloco = "Despachos e Memorandos " + hoje;
 						break;
 				}
 				
 				if (!expr_bloco) {
-					reject(`Tipologia "${reference.tipo}" não tratada`);
+					reject(`Tipologia "${reference.typology}" não tratada`);
 					return;
 				}
 				
@@ -709,7 +559,7 @@ function addFuncoesAnatel(aberto) {
 					}
 					
 					waitMessage("Consultando RA...");
-					consultarurlservico(302, info.cpf).then(url => browser.runtime.sendMessage({action: "open", url: [url]})).finally(() => waitMessage(null)).catch(error => errorMessage(error, "RA"));
+					consultarUrlServico(302, info.cpf).then(url => browser.runtime.sendMessage({action: "open", url: [url]})).finally(() => waitMessage(null)).catch(error => errorMessage(error, "RA"));
 			}
 			break;
 
