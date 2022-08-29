@@ -62,13 +62,13 @@ if (editor) {
 	//VERSÃO 1 - Metadado (será descontinuada futuramente)
 	html = html.replace(regex, (m0, m1, m2, m3, m4, m5, m6, m7, m8, m9) => {
 		metadata = { 
-			proc: $area.html(m1).text().trim(), 
-			spec: $area.html(m2).text().trim(), 
+			proc: $area.html(m1 ?? "").text().trim(), 
+			spec: $area.html(m2 ?? "").text().trim(), 
 			inter: (m3 ?? '') + (m4 ?? ''), 
 			dest: (m5 ?? '') + (m6 ?? ''), 
-			fields: $area.html(m7).text(), 
-			refs: $area.html(m8).text(), 
-			settings: {inputs: $area.html(m9).text()}
+			fields: $area.html(m7 ?? "").text(), 
+			ref: $area.html(m8 ?? "").text(), 
+			settings: {inputs: $area.html(m9 ?? "").text()}
 		};
 
 		return "";
@@ -76,7 +76,7 @@ if (editor) {
 
 	//VERSÃO 2 - Metadado
 	html = html.replace(/#CFOR-MD-BEGIN;[\w\W]*#CFOR-MD-END;/i, m0 => {
-		metadata = parseMetadata($area.html(m0).text().trim(), 'CFOR-MD-');
+		metadata = parseMetadata($area.html(m0 ?? "").text().trim(), 'CFOR-MD-');
 		return "";
 	});
 
@@ -399,11 +399,10 @@ if (editor) {
 
 	
 	// permitir a seleção de documento de referência nos casos quando não configurado e utilizada função $ref
-	if (!metadata.settings.reft && html.match(/\$ref\.[a-z_]\w*\b/i)) metadata.settings.reft = '?'; 
 	let prompt_ref = metadata.settings.reft && 
 					(!metadata.ref || 
-					 !metadata.ref.name ||
-   					 NodeSei.translateType(metadata.ref.name) != metadata.settings.reft ||
+					 !metadata.ref.nome ||
+   					 NodeSei.translateType(metadata.ref.nome) != metadata.settings.reft ||
    					 metadata.settings.refv);	
 	
  	(async function(html) {	

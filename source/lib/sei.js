@@ -1103,16 +1103,19 @@ function referenceFromData(data) {
 
 	if (typeof data === 'string') { 
 		const regex = /ref\.(?:([^.;]*?)\.)?([^=;]*?)\s*=\s*([^;]*?)\s*;/gi;
-		let result = undefined;
+		let value, result = undefined;
 	
 		while ((m = regex.exec(data)) !== null) {
 			if (m.index === regex.lastIndex) regex.lastIndex++;
 			if (!result) result = {};
+
+            value = m[3];
+			if (value === 'true' || value === 'false') value = value == 'true';
 	
 			if (m[1]) {
 				if (!result[m[1]]) result[m[1]] = {};
-				result[m[1]][m[2]] = m[3];
-			} else result[m[2]] = m[3];
+				result[m[1]][m[2]] = value;
+			} else result[m[2]] = value;
 		}
 		
 		return result;
