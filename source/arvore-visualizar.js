@@ -53,12 +53,13 @@ function addNovo() {
 	$.ajax({url: browser.runtime.getURL('default-settings.json'), async: false, dataType: 'json', success: response => cfor_settings = response});
 
 	let info = getCurrentProcInfo();
-	let reference = referenceFromData(getCurrentNodeSei());
+	let currentNode = getCurrentNodeSei();
+	let reference = referenceFromData(currentNode);
 	let variables = {hoje: new Date().toDateBR(), info: Object.freeze(info), ref: Object.freeze(reference)};
 	let items = [];
 				 
 	let url_clonado;			 
-	if (/*$('#divArvoreAcoes a[href*="acao=protocolo_modelo_cadastrar"]').length && */(url_clonado = $('#divArvoreAcoes a[href*="acao=documento_alterar"]').attr('href'))) {
+	if (!currentNode.extern && (url_clonado = $('#divArvoreAcoes a[href*="acao=documento_alterar"]').attr('href'))) {
 		items.push({id: "clone", text: "Clonar documento", icon: "menu-copy-icon"}, "-");
 	}
 	
@@ -132,11 +133,11 @@ function addNovo() {
 			}
 					
 			if (e.data.upload) {
-					url = $html.find("[data-desc*=externo] .ancoraOpcao").attr("href");
+				url = $html.find("[data-desc*=externo] .ancoraOpcao").attr("href");
 				predata.tipo = e.data.type;
-				if (e.data.description) predata.desc = solve(e.data.description, null, variables);
+				if (e.data.description) predata.desc = e.data.description.replace(/\$(\w+)/ig, (m0, name) => variables.getValue(name));
 				predata.acesso = e.data.access;
-					predata.upload = true;
+				predata.upload = true;
 			} else {
 				url = $html.find(`[data-desc='${e.data.type}'] .ancoraOpcao`).attr("href");
 				if (e.data.template) predata.txtpad = e.data.template;

@@ -802,7 +802,7 @@ class NodeSei {
 			let data = source.ownerDocument.documentElement.innerHTML.match(new RegExp(`controlador\\.php\\?acao=documento_visualizar&.*?&id_documento=${this.id}\\b[^'"]*`, "i"));
 			this.#href = data ? data[0] : null;
 
-			if (this.id && (data = $(source.ownerDocument).find(`#icon${this.id}`).attr('src'))) this.extern = !!data.match(/\bpdf\./i);
+			if (this.id && (data = $(source.ownerDocument).find(`#icon${this.id}`).attr('src'))) this.extern = !!data.match(/pdf\./i);
 			else this.extern = false;
 		}
 
@@ -825,7 +825,7 @@ class NodeSei {
 			m = doc_arvore && $(doc_arvore).find('script:contains("inicializar()")').text();
 
 			if (m = m && m.match(new RegExp(`controlador\\.php\\?acao=documento_alterar_recebido\\b.*?id_documento=${this.id}[^"]+`, 'i'))) {
-				let result = syncAjaxRequest(url);
+				let result = syncAjaxRequest(m[0]);
 				if (result.ok && (result = $(result.response).find("#txtDataElaboracao").val())) this.#__date = result;
 			}
 	
