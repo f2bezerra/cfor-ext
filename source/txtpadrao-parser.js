@@ -76,7 +76,7 @@ if (editor) {
 
 	//VERSÃO 2 - Metadado
 	html = html.replace(/#CFOR-MD-BEGIN;[\w\W]*#CFOR-MD-END;/i, m0 => {
-		metadata = parseMetadata($area.html(m0 ?? "").text().trim(), 'CFOR-MD-');
+		metadata = parseMetadata($area.html(m0 ?? "").text().trim().replace(/\@[^@\s]+?\@/g, ""), 'CFOR-MD-');
 		return "";
 	});
 
@@ -447,7 +447,8 @@ if (editor) {
 			if (!data) return html;
 
 			for (let v of Object.keys(data)) {
-				html = html.replace(new RegExp(`%var\\(${v}(?:@([\\w.-]+))?(?:;(.+))?\\)%`, "ig"), (m0, format, _default) => data[v] ? formatValue(data[v], format) : (typeof data[v] == "boolean" ? data[v] : (_default ? _default : "")));
+				
+				html = html.replace(new RegExp(`%var\\(${v}(?:\\@([^;)]+))?(?:;([^)]+))?\\)%`, "ig"), (m0, format, _default) => data[v] ? formatValue(data[v], format) : (typeof data[v] == "boolean" ? data[v] : (_default ? _default : "")));
 				uservars[v]= data[v];
 			}
 

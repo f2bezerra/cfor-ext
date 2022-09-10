@@ -3921,7 +3921,7 @@ function parseMetadata(data, prefix = '') {
 
         let value = m[2];
         if (value == 'true' || value == 'false') value = value == 'true';
-        if (typeof(value) == 'string' && !isNaN(parseFloat(value))) value = Number(value);
+        if (typeof(value) == 'string' && !isNaN(value)) value = Number(value);
 
         if (m[1].indexOf('.') == -1) result[m[1]] = value;
         else {
