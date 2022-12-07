@@ -345,7 +345,8 @@ function open_dialog(id, title, width, height, button, fields, callback) {
 	
 	let $dlg_body = $(dlg).find('.cke_dialog_page_contents tbody');
 	
-	let $tr, $td, first_elem;
+	let $tr, $td, first_elem, has_field_visibility = false;
+
 	for (let f of fields) {
 
 		if (f.type == 'separator') {
@@ -397,10 +398,12 @@ function open_dialog(id, title, width, height, button, fields, callback) {
 			case "select":	
 				f.elem = $(`<select id="${f.id}" class="cke_dialog_ui_input_select" aria-required="true"></select>`).get(0);
 				if (f.items) {
-					f.items.split(",").forEach((item, index) => {
+					if (typeof f.items == "string") f.items = f.items.split(",");
+					f.items.forEach((item, index) => {
 						let m_opt;
 						if (m_opt = item.match(/\s*([^=]*?)\s*=(.+)/i)) $(f.elem).append(`<option value="${m_opt[1] == '_'?'':m_opt[1]}">${m_opt[2]}</option>`);
-						else $(f.elem).append(`<option value="${index}">${item}</option>`);
+						else if (f.indexedValues) $(f.elem).append(`<option value="${index}">${item}</option>`);
+						else $(f.elem).append(`<option>${item}</option>`);
 					});
 					
 					if (f.value == undefined) f.elem.selectedIndex = 0;
@@ -454,6 +457,12 @@ function open_dialog(id, title, width, height, button, fields, callback) {
 		
 
 		$div_f.append(f.elem);
+
+		if (f.visibility != undefined) {
+			f.visibility = f.visibility.trim();
+			if (f.visibility) has_field_visibility = true;
+		}
+
 	}
 	
 	$(dlg).find('a.cke_dialog_close_button,a.cke_dialog_ui_button_cancel,.cke_dialog_ui_button_ok').on('click', (event) => {
@@ -521,6 +530,53 @@ function open_dialog(id, title, width, height, button, fields, callback) {
 		$(event.currentTarget).closest('.cke_editor_txaConteudo_dialog').get(0).remove();
 		$('.cke_dialog_background_cover').remove();
 	});
+
+	if (has_field_visibility) {
+		let fields_map = fields.reduce((m, f) => (m[f.id] = f, m), {});
+
+		let get_field_value = f => {
+		
+			if (!f || f.nodata || f.type == "button") return undefined;
+			
+			let r, value = null;
+			
+			if (f.type == "radio") value = (r = f.items.find(e => e.checked)) && (r.hasAttribute("value") ?  $(r).attr('value') : f.items.indexOf(r));
+			else value = f.type=="check" ? f.elem.checked : f.type=="date" ? $(f.elem).val().replace(/(\d{4})-(\d{1,2})-(\d{1,2})/i, "$3/$2/$1") : $(f.elem).val();
+			
+			if (f.type == "text" && f.upper && value) value = value.toUpperCase();
+			
+			if (f.type == "number") value = Number(value);
+			
+			return value;
+		};		
+		
+		let field_visible = f => {
+			if (!f.visibility) return true; 
+			
+			let expr = f.visibility.replace(/\$([a-z_]\w*)\b/gi, (m0, fname) => {
+				if (fname == f.id) return "true";
+				
+				let vf = fields_map[fname];
+				if (vf.visibility) {
+					if (new RegExp(`\\$${f.id}\\b`).exec(vf.visibility)) return "true";
+					if (!field_visible(vf)) return "false";
+				}
+				
+				let v = get_field_value(vf);
+				return v == undefined ? 'NULL' : v;
+			});
+			
+			return solve(expr);
+		};
+		
+		let f_visibilities = fields.filter(f => f.visibility);
+		let change_event_handler = e => {
+			for (let f of f_visibilities) $(f.elem).closest('tr').css('display', field_visible(f) ? '' : 'none' );
+		};
+		
+		$(dlg).find('input,select').on('change', change_event_handler);		
+		change_event_handler();
+	}	
 	
 	$('.cke_dialog_background_cover').css("display", "block");
 	$(dlg).css("visibility", "hidden");

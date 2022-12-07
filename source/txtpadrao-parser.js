@@ -496,7 +496,7 @@ if (editor) {
 				let lanctos = [];
 				for (let f of extr.fistel.split(",")) {
 					try {
-						waitMessage(`Consultando extrato do fistel ${f}...`);
+						waitMessage(`Consultando extrato do fistel ${f}...`, {backgroundOpacity: 0, backgroundColor: "#aaa"});
 						let extrato = await consultarExtrato(f, extr.filtro);
 						if (extrato && extrato.lancamentos && extrato.lancamentos.length) lanctos.push(...extrato.lancamentos.map(l => {
 							l.fistel = f;
@@ -569,7 +569,7 @@ if (editor) {
 
 		//atualizar tabelas dinâmicas
 		if ($tables.length) {
-			waitMessage("Atualizando tabelas dinâmicas...");
+			waitMessage("Atualizando tabelas dinâmicas...", {backgroundOpacity: 0, backgroundColor: "#aaa"});
 			
 			let write_row_message = (t, m, c="red") => {
 				$(t).find("tbody tr").remove();
@@ -586,7 +586,7 @@ if (editor) {
 				$(table).removeAttr("dynamic-table dynamic-table-id dynamic-table-data");
 
 				try {
-					table_data = uservars[identityNormalize(table_data.trim().slice(1))];	
+					table_data = solve(table_data.replace(/^\s*var:/, "$"), null, uservars);
 				} catch (err) {
 					table_data = undefined;
 				}

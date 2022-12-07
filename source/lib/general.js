@@ -1370,6 +1370,10 @@ function waitMessage(msg, options) {
 
 			$(bkgrd).css("zIndex", 100000);
 			$(container).css("zIndex", 100001);
+
+			if (options.backgroundOpacity != undefined) $(bkgrd).css("opacity", (1-options.backgroundOpacity));
+			if (options.backgroundColor != undefined) $(bkgrd).css("background-color", options.backgroundColor);
+		
 			doc.body.appendChild(bkgrd);
 			doc.body.appendChild(container);
 			$(doc.body).addClass('stop-scrolling');

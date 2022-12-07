@@ -236,7 +236,7 @@ async function consultarExtrato(fistel, filter) {
 			$rows.each((index, row) => {
 				let lancto = {rec: $(row).attr('id').replace(/\D/g,"")};
 				let cols = $(row).children('td');
-				lancto.seq = Number($(cols[8]).find('label').first().text().trim());
+				lancto.seq = Number($(cols[8]).text().trim());
 				lancto.receita = $(cols[0]).text().trim();
 				lancto.ref = Number($(cols[1]).text().trim());
 				lancto.ano = Number($(cols[2]).text().trim());

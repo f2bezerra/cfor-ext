@@ -46,11 +46,10 @@ function enableIntellisense(target, options) {
 		}
 
 		if (!list) throw "Lista vazia";
-		if (!start) throw "Não informado token inicializador";
 		
 		var token;
 		
-		if (options.tokens && options.tokens.includes(start)) {
+		if (start && options.tokens && options.tokens.includes(start)) {
 			token = start;
 			start = undefined;
 		}
@@ -187,7 +186,7 @@ function enableIntellisense(target, options) {
 			}
 			
 			if (target.intellisense.targetIsInput) {
-				let result = options.onSelect?options.onSelect.call(target, {value: $(item).attr('value'), desc: $(item).find('a').attr('title'), token: token, range: {start: (startOffset?startOffset:0), end: target.selectionEnd}, event: e}):$(item).attr('value');
+				let result = options.onSelect?options.onSelect.call(target, {value: $(item).attr('value'), desc: $(item).find('a').attr('title'), token: token, range: {start: (startOffset?startOffset:0), end: target.selectionEnd}, event: e, dom: item}):$(item).attr('value');
 				
 				if (result && delim) {
 					result = delim[0] + result;
@@ -204,15 +203,19 @@ function enableIntellisense(target, options) {
 				let sel = target.intellisense.doc.getSelection();
 				let endOffset = sel.focusOffset;
 				let _node = sel.focusNode;
+				let range = null;
+
+				if (startOffset !== undefined) {
+					sel.removeAllRanges();
+					
+					range = target.intellisense.doc.createRange();
+					range.setStart(_node, startOffset + (options.tokens && !options.onSelect && !start && !delim?1:0));
+					range.setEnd(_node, endOffset);
+					sel.addRange(range);
+					range.deleteContents();
+				}
 				
-				sel.removeAllRanges();
-				let range = target.intellisense.doc.createRange();
-				range.setStart(_node, startOffset + (options.tokens && !options.onSelect && !start && !delim?1:0));
-				range.setEnd(_node, endOffset);
-				sel.addRange(range);
-				range.deleteContents();
-				
-				let result = options.onSelect?options.onSelect.call(target, {value: $(item).attr('value'), desc: $(item).find('a').attr('title'), token: token, range: range, event: e}):$(item).attr('value');
+				let result = options.onSelect?options.onSelect.call(target, {value: $(item).attr('value'), desc: $(item).find('a').attr('title'), token: token, range: range, event: e, dom: item}):$(item).attr('value');
 
 				if (result && delim) {
 					result = delim[0] + result;
@@ -327,7 +330,7 @@ function enableIntellisense(target, options) {
 				search_value = search_value.substring(startOffset, sel.focusOffset);
 			}
 			
-			if (search_value && !start) {
+			if (search_value && !start && token) {
 				search_value = search_value.slice(1);
 				if (!search_value) return;
 			}
@@ -435,6 +438,42 @@ function enableIntellisense(target, options) {
 		return null;
 	};
 	
+	if (!options.disableCtrlSpace) {
+		$(target).on('keydown', function(e) {
+			if (e.key == " " && e.ctrlKey) {
+				if (target.intellisense.picker) return;
+				
+				let list = options.list;
+				
+				if (typeof list == "function") {
+					let node, args = {target: target};
+					if (node = get_current_node()) args.previous = node.text;
+
+					if (options.tokens) {
+						let result, results = [];
+						for(let token of options.tokens.split("")) {
+							args.token = token;
+							if ((result = list.call(target, args))) {
+								if (typeof result == "string") {
+									result = result.split(options.listSeparator).map((value) => {
+										let m_item;
+										if (m_item = value.match(/^\s*(\w[^=]*)\s*=\s*(.+)/)) return {value: m_item[1], text: m_item[2]};
+										return {text: value};
+									});
+								} 
+								if (result.length) results.push(...result);
+							}
+						}
+						list = results;
+						list.sort((a, b) => a.text.localeCompare(b.text, 'pt-br', { sensitivity: 'base' }));
+
+					} else if (!(list = list.call(target, args))) return;
+				}
+
+				target.intellisense.open(list, "");
+			}
+		});
+	}
 	
 	$(target).on('keypress', function(e) {
 

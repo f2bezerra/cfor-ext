@@ -103,33 +103,29 @@ $(function() {
 		
 
 		//Lista de campos para inserção no texto padrão
-		var fdfns = [{group: "Campos",
-					  classItem: "cfor-li-field",
-					  items: [{text: "cod_servico", desc: "Código do Serviço"},
-							  {text: "desc_servico", desc: "Descrição do Serviço", format: "up|low"},
-							  {text: "ind_servico", desc: "Indicativo do Serviço", format: "up|low"},
-							  {text: "sigla_servico", desc: "Sigla do Serviço", format: "up|low"},
-							  {text: "cpfj_int", desc: "CPF ou CNPJ do Interessado", format: "*|num"},
-							  {text: "desc_cpfj_int", desc: "Descrição do CPF ou CNPJ do Interessado", format: "*|num"},
-							  {text: "cpfj_dest", desc: "CPF ou CNPJ do Destinatário", format: "*|num"},
-							  {text: "desc_cpfj_dest", desc: "Descrição do CPF ou CNPJ do Destinatário", format: "*|num"},
-							  {text: "is_int_pf", desc: "Indicador se o interessado é Pessoa Física"},
-							  {text: "is_int_pj", desc: "Indicador se o interessado é Pessoa Jurídica"},
-							  {text: "is_dest_pf", desc: "Indicador se o destinatário é Pessoa Física"},
-							  {text: "is_dest_pj", desc: "Indicador se o destinatário é Pessoa Jurídica"},
-							  {text: "is_sarc", desc: "Indicador se o processo é de SARC"},
-							  {text: "usu_sei_ok", desc: "Indicador se o existe Usuário Externo SEI regular"},
-							  {text: "seq", desc: "Retornar valor de sequencial", value: "seq_<nome>?"}]},
-							  
-		             {group: "Funções",
-					  classItem: "cfor-li-function",
-					  items: [{text: "ep_has", desc: "Testar contéudo do campo especificação do processo", value: "ep_has(<expressão>?)"},
-					  
-							  {text: "var", desc: "Retornar valor de variável", value: "var(<nome@up|low|ano|num>?;<tipo:text,check,calendar,choice>?;<rótulo>?;<padrão>?)"},
-							  {text: "field", desc: "Retornar valor de campo de processo", value: "field(<nome@up|low|ano|num>?;<padrão>?)"},
-							  {text: "ref", desc: "Retornar valor de referência", value: "ref(<propriedade:nome,sei,link,num,ano,data>?;<padrão>?)"},
-							  {text: "extrato", desc: "Retornar extrato", value: "extrato(<fistel>?;<status:Q=Quitado,D=Devedor,P=Pendente>?;<filtro:{fistel,receita,ano,vencto,valor,status}>?)"},
-							  {text: "link_boleto", desc: "Retornar link de boleto", value: "link_boleto(<texto>?;<fistel>?;<cpfj>?)"}]}];
+		var fdfns = [{text: "cod_servico", desc: "Código do Serviço", class: "cfor-li-field"},
+		 			 {text: "desc_servico", desc: "Descrição do Serviço", class: "cfor-li-field", format: "up|low"},
+					 {text: "ind_servico", desc: "Indicativo do Serviço", class: "cfor-li-field", format: "up|low"},
+					 {text: "sigla_servico", desc: "Sigla do Serviço", class: "cfor-li-field", format: "up|low"},
+					 {text: "cpfj_int", desc: "CPF ou CNPJ do Interessado", class: "cfor-li-field", format: "*|num"},
+					 {text: "desc_cpfj_int", desc: "Descrição do CPF ou CNPJ do Interessado", class: "cfor-li-field", format: "*|num"},
+					 {text: "cpfj_dest", desc: "CPF ou CNPJ do Destinatário", class: "cfor-li-field", format: "*|num"},
+					 {text: "desc_cpfj_dest", desc: "Descrição do CPF ou CNPJ do Destinatário", class: "cfor-li-field", format: "*|num"},
+					 {text: "is_int_pf", desc: "Indicador se o interessado é Pessoa Física", class: "cfor-li-field"},
+					 {text: "is_int_pj", desc: "Indicador se o interessado é Pessoa Jurídica", class: "cfor-li-field"},
+					 {text: "is_dest_pf", desc: "Indicador se o destinatário é Pessoa Física", class: "cfor-li-field"},
+					 {text: "is_dest_pj", desc: "Indicador se o destinatário é Pessoa Jurídica", class: "cfor-li-field"},
+					 {text: "is_sarc", desc: "Indicador se o processo é de SARC", class: "cfor-li-field"},
+					 {text: "usu_sei_ok", desc: "Indicador se o existe Usuário Externo SEI regular", class: "cfor-li-field"},
+					 {text: "seq", desc: "Retornar valor de sequencial", value: "seq_<nome>?", class: "cfor-li-field"},
+
+					 {text: "ep_has", desc: "Testar contéudo do campo especificação do processo", value: "ep_has(<expressão>?)", class: "cfor-li-function"},
+					 {text: "var", desc: "Retornar valor de variável", value: "var(<nome@up|low|ano|num>?;<tipo:text,check,calendar,choice>?;<rótulo>?;<padrão>?)", class: "cfor-li-function"},
+					 {text: "field", desc: "Retornar valor de campo de processo", value: "field(<nome@up|low|ano|num>?;<padrão>?)", class: "cfor-li-function"},
+					 {text: "ref", desc: "Retornar valor de referência", value: "ref(<propriedade:nome,sei,link,num,ano,data>?;<padrão>?)", class: "cfor-li-function"},
+					 {text: "extrato", desc: "Retornar extrato", value: "extrato(<fistel>?;<status:Q=Quitado,D=Devedor,P=Pendente>?;<filtro:{fistel,receita,ano,vencto,valor,status}>?)", class: "cfor-li-function"},
+					 {text: "link_boleto", desc: "Retornar link de boleto", value: "link_boleto(<texto>?;<fistel>?;<cpfj>?)", class: "cfor-li-function"}
+		];
 
 
 		var getIntellisenseList = function(e) {
@@ -152,6 +148,12 @@ $(function() {
 						if (mv.index === rv.lastIndex) rv.lastIndex++;
 						variables.push({text: mv[1], desc: mv[3], class: "cfor-li-var"});
 					}
+
+					rv = /\$(\w+)(?=\s*=[^=])/gi;
+					while (mv = rv.exec(doc.body.innerHTML)) {
+						if (mv.index === rv.lastIndex) rv.lastIndex++;
+						variables.push({text: mv[1], desc: "Variável definida pelo usuário", class: "cfor-li-var"});
+					}
 					
 					variables.push({text: "ref.nome", desc: "Nome do documento de referência", class: "cfor-li-var-struct"});
 					variables.push({text: "ref.sei", desc: "Número sei do documento de referência", class: "cfor-li-var-struct"});
@@ -160,6 +162,9 @@ $(function() {
 					variables.push({text: "ref.ano", desc: "Ano do documento de referência", class: "cfor-li-var-struct"});
 					variables.push({text: "ref.link", desc: "Link para o documento de referência", class: "cfor-li-var-struct"});
 					variables.push({text: "ref.texto", desc: "Nome completo do documento de referência", class: "cfor-li-var-struct"});
+
+					variables.push({text: "hoje", desc: "Data de hoje", class: "cfor-li-macro"});
+					variables.push({text: "umi", desc: "Data da última movimentação do interessado", class: "cfor-li-macro"});
 
 					return variables;
 				}
@@ -182,14 +187,15 @@ $(function() {
 				}
 
 				case "@": {
-					let fds = fdfns[0].items;
-					e.previous = e.previous.toLowerCase();
+					if (e.previous) {
+						e.previous = e.previous.toLowerCase();
 					
-					let format = "";
-					if (e.previous[0] == "$") format = "up|low|num|ano|ext";
-					else if (f = fds.find((i) => {return (i.format && i.text == e.previous)})) format = f.format;
-					
-					if (format) return format.split("|").map((v) => {return {text: v, class: "cfor-li-format"}});
+						let format = "";
+						if (e.previous[0] == "$") format = "up|low|num|ano|ext";
+						else if (f = fdfns.find(i => {return i.format && i.class == "cfor-li-field" && i.text == e.previous})) format = f.format;
+						
+						if (format) return format.split("|").map((v) => {return {text: v, class: "cfor-li-format"}});
+					}
 				}
 			}
 			
@@ -378,6 +384,13 @@ $(function() {
 		
 		//--- Opções de intellisense
 		var edit_intellisense_options = {tokens: "%@$.", includePreviousChars: "$\\.", list: getIntellisenseList, onSelect: function(e) {
+			if (!e.token) {
+				if ($(e.dom).is('.cfor-li-field') || $(e.dom).is('.cfor-li-function')) e.token = "%";
+				else if ($(e.dom).is('.cfor-li-var') || $(e.dom).is('.cfor-li-var-struct') || $(e.dom).is('.cfor-li-macro')) e.token = "$";
+				else if ($(e.dom).is('.cfor-li-var-prop')) e.token = ".";
+				else if ($(e.dom).is('.cfor-li-format')) e.token = "@";
+			}
+
 			if (e.token == "%") {
 				let new_value = "%" + e.value.replace(/<([^:>]+)[^>]*?>\?/g, "$1") + "%";
 				let v = $(this).val();
@@ -389,10 +402,8 @@ $(function() {
 					this.selectionEnd = e.range.start + fin;
 				}
 				return;
-			} else return e.token + e.value;
+			} else return (e.token ?? '') + e.value;
 		}};
-		
-		var sigec_intellisense_options = {onlyTokens: false, list: "fistel,seq,rec,vencto,valor,status", onSelect: (e) => {return `{${e.value}}`}};					
 		
 		var edit_filter = function(elems) {
 			
@@ -649,40 +660,62 @@ $(function() {
 			let table = $(node).closest('table[dynamic-table]').get(0);
 			let default_id = $(table).attr("dynamic-table-id");
 			let default_table = $(node).closest('table[dynamic-table]').attr('dynamic-table');
-			let default_data = "";
+			let default_list_fontes = "param=Parâmetros";
+			let default_fonte = "param";
+			let default_value = Array(3).fill("");
+
+			let list_vars = [];
+			let mv, rv = /([\w-]+=["']\s*)?\$(\w+)(?=\s*=[^=])/gi;
+			while (mv = rv.exec(doc.body.innerHTML)) {
+				if (mv.index === rv.lastIndex) rv.lastIndex++;
+				if (!mv[1] || mv[1].indexOf('dynamic-table') == -1) list_vars.push(mv[2]);
+			}
+
+			if (list_vars.length) default_list_fontes += ",var=Variável";
 
 			if (d = $(table).attr("dynamic-table-data")) {
-				let default_fistel = "";
-				let default_status = "";
-				let default_periodo = undefined;
-				
-				if (v = d.match(/&?\bfistel=(.*?)(?=&\w+=|$)/i)) default_fistel = v[1];
-				if (v = d.match(/&?\bstatus=(.*?)(?=&\w+=|$)/i)) default_status = v[1];
-				if (v = d.match(/&?\bini=(.*?)(?=&\w+=|$)/i)) default_periodo = [v[1]];
-				
-				if (v = d.match(/&?\bfin=(.*?)(?=&\w+=|$)/i)) {
-					if (!default_periodo) default_periodo = [""];
-					default_periodo.push(v[1]);
+				if (v = d.match(/\s*params:(.+)s*/i)) {
+					v = v[1].split(";");
+					Array.prototype.splice.apply(default_value, [0, v.length].concat(v));
+				} else if (list_vars.length) {
+					default_fonte = "var";
+					default_value[0] = d.trim().slice(4);					
 				}
-				
-				if (default_table == "lancto" && default_fistel) {
-					default_data = "%extrato(" + default_fistel;
-					if (default_status) {
-						default_data += ";" +  default_status;
-						if (default_periodo) {
-							if (default_periodo[0]) default_data += "; {vencto} >= " + default_periodo[0];
-							if (default_periodo[1]) default_data += (default_periodo[0] ? " AND " : "; ") + "{vencto} <= " + default_periodo[1];
-						}
-					}
-					default_data += ")%";
-					
-				} else default_data = d;
 			}
+
+			var sigec_intellisense_options = {
+				tokens: "${",
+				canShowAll: true,
+				list: function(e) {
+					let result = [];
+					if (e.token === '$') result = getIntellisenseList(e);
+					if (e.token === '{') {
+						result.push({text: "fistel", desc: "Número de fistel do Lançamento", class: "cfor-li-struct"});
+						result.push({text: "seq", desc: "Número de sequencial do Lançamento", class: "cfor-li-struct"});
+						result.push({text: "rec", desc: "Código da receita do Lançamento", class: "cfor-li-struct"});
+						result.push({text: "vencto", desc: "Data de vencimento do Lançamento", class: "cfor-li-struct"});
+						result.push({text: "valor", desc: "Valor do Lançamento", class: "cfor-li-struct"});
+						result.push({text: "status", desc: "Status do Lançamento", class: "cfor-li-struct"});
+						result.push({text: "ano", desc: "Ano do Lançamento", class: "cfor-li-struct"});
+					}
+
+					return result; 
+				},
+				onSelect: (e) => {
+					if ($(e.dom).is('.cfor-li-struct')) return `{${e.value}}`;
+					return '$' + e.value;
+				}
+			};					
+
 			
-			open_dialog("dtable_dlg", "Tabela Dinâmica", 400, 50, "Limpar",
+			open_dialog("dtable_dlg", "Tabela Dinâmica", 450, 50, "Limpar",
 						[{id: "id", type: "text", label: "Id:", label_position: "top", value: default_id},
-						 {id: "tabela", type: "select", label: "Tabela:", label_position: "top", items: "lancto=Lançamentos", value: default_table},
-						 {id: "dados", type: "text", label: "Dados:", label_position: "top", value: default_data, intellisense: edit_intellisense_options}], e => {
+						 {id: "tabela", type: "select", label: "Tabela:", label_position: "top", items: "lancto=Lançamentos", inline: true, value: default_table},
+						 {id: "tipo_fonte", type: "select", label: "Tipo de Fonte:", label_position: "top", items: default_list_fontes, inline: true, value: default_fonte},
+						 {id: "vars", type: "select", label: "Variáveis:", label_position: "top", items: list_vars, value: default_value[0], visibility: "$tipo_fonte == var"},
+						 {id: "lancto_fistel", type: "text", label: "Fistel:", label_position: "top", value: default_value[0], intellisense: edit_intellisense_options, visibility: "$tipo_fonte == param"},
+						 {id: "lancto_status", type: "select", label: "Status:", label_position: "top", items: "P=Pendente,D=Devedor,Q=Quitado", value: default_value[1], visibility: "$tipo_fonte == param"},
+						 {id: "lancto_filter", type: "text", label: "Filtro:", label_position: "top", value: default_value[2], intellisense: sigec_intellisense_options, visibility: "$tipo_fonte == param"}], e => {
 
 				if (e.action == "limpar") {
 					e.fields.clear();
@@ -701,7 +734,17 @@ $(function() {
 								   break;
 				}
 
-				
+				let fonte = "";
+				switch (e.data.tipo_fonte) {
+					case "var": fonte = 'var:' + e.data.vars; break;
+					case "param": 
+						fonte = (e.data.id?'$' + e.data.id + ' = ':"");
+						fonte += "%extrato(" + e.data.lancto_fistel + ";" + e.data.lancto_status;
+						if (e.data.lancto_filter && e.data.lancto_filter.trim()) fonte += ";" + e.data.lancto_filter.trim();
+						fonte += ")%";
+						break;
+				} 
+
 				if (table) {
 					if (default_table && default_table != e.data.tabela) {
 						$(table).find('thead,tbody,tr').remove();
@@ -720,9 +763,9 @@ $(function() {
 						$(table).find('tbody').append($tr_tbody);
 					}
 					
-					$(table).attr("dynamic-table", e.data.tabela).attr("dynamic-table-id", e.data.id).attr("dynamic-table-data", e.data.dados);
+					$(table).attr("dynamic-table", e.data.tabela).attr("dynamic-table-id", e.data.id).attr("dynamic-table-data", fonte);
 				} else {
-					let $table = $(`<table dynamic-table="lancto" dynamic-table-id="${e.data.id}" dynamic-table-data="${e.data.dados}" cellspacing="0" cellpadding="0" border="1" style="margin-left:auto;margin-right:auto;" spellcheck="false">
+					let $table = $(`<table dynamic-table="lancto" dynamic-table-id="${e.data.id}" dynamic-table-data="${fonte}" cellspacing="0" cellpadding="0" border="1" style="margin-left:auto;margin-right:auto;" spellcheck="false">
 										<thead />
 										<tbody />
 									</table>`);
@@ -840,6 +883,72 @@ $(function() {
 			$(doc).find('li[condition]').tooltip(li_tooltip_options);
 			$(doc).find('td[bookmark]').tooltip(bm_tooltip_options);
 			$(doc).find('table[dynamic-table]').tooltip(table_tooltip_options);
+
+			var cm_observer = null;
+
+			$(doc).on('contextmenu', function(e) {
+				if ($(e.target).is('table[dynamic-table]') || e.target.closest('table[dynamic-table]')) {
+					var table = e.target.tagName == "TABLE" ? e.target : e.target.closest('table');
+					var cell =  e.target.tagName == "TD" ? e.target : (e.target.closest('td') || e.target.closest('th'));
+					var index = cell ? cell.cellIndex : undefined;
+
+					if (!cm_observer) {
+						let cm_observer = new MutationObserver(mutations => {
+							mutations.forEach(mutation => {
+								if ($(mutation.target).is('.cke_menu_panel')) {
+									if (!$('.cke_menu_panel:visible').length) {
+										cm_observer.disconnect();
+										cm_observer = null;
+										return;
+									}
+
+									if (mutation.target.style.display !== 'none') {
+										let iframe = mutation.target.querySelector('iframe');
+										if (iframe) {
+											let frame_doc = iframe.contentDocument || iframe.contentWindow.document;
+											let anchors = frame_doc.querySelectorAll('.cke_menuitem a');
+											for (let anchor of anchors) {
+												if ($(anchor).text().match(/inserir\s+coluna/i)) {
+													anchor.onclick = (event) => {
+														event.preventDefault();
+														event.stopPropagation();
+
+														open_dialog("cfor_addcol_dtable", "Inserir Coluna", 200, 100, "Limpar",
+														[{id: "title", type: "text", label: "Título:", label_position: "top", value: ""},
+														 {id: "field", type: "select", label: "Campo:", items: "fistel,seq,rec,vencto,valor,status,ano", label_position: "top", value: ""}], evt => {
+
+															if (evt.action == "limpar") {
+																evt.data.title = "";
+																evt.data.field = "";
+															} else if (evt.action != "ok") return true;
+															
+															if ($(anchor).text().match(/direita/i)) {
+																$(table).find(`th:nth-child(${index+1})`).after(`<th>${evt.data.title}</th>`);
+																$(table).find(`td:nth-child(${index+1})`).after(`<td>{${evt.data.field}}</td>`);
+															} else {
+																$(table).find(`th:nth-child(${index+1})`).before(`<th>${evt.data.title}</th>`);
+																$(table).find(`td:nth-child(${index+1})`).before(`<td>{${evt.data.field}}</td>`);
+															}
+															return true;
+														});
+								
+													};
+												}
+											}
+										}
+									}
+								} 
+							});
+						});	
+						
+						cm_observer.observe(document.body, {attributes: true, subtree: true, attributeFilter: ['style']});
+					}
+
+				} else if (cm_observer) {
+					cm_observer.disconnect();
+					cm_observer = null;
+				}
+			});
 			
 			$(doc).on("focus click", (evt) => {
 				// en_btn(btn_field);
@@ -872,7 +981,13 @@ $(function() {
 									 list: getIntellisenseList,
 
 									 onSelect: function(e) {
-										
+										if (!e.token) {
+											if ($(e.dom).is('.cfor-li-field') || $(e.dom).is('.cfor-li-function')) e.token = "%";
+											else if ($(e.dom).is('.cfor-li-var') || $(e.dom).is('.cfor-li-var-struct') || $(e.dom).is('.cfor-li-macro')) e.token = "$";
+											else if ($(e.dom).is('.cfor-li-var-prop')) e.token = ".";
+											else if ($(e.dom).is('.cfor-li-format')) e.token = "@";
+										}
+																	
 										 if (e.token == "%")  return insertNode(`%${e.value}%`, e.desc);
 
 										 if (e.token == "$") return insertNode(`$${e.value}`, e.desc);
